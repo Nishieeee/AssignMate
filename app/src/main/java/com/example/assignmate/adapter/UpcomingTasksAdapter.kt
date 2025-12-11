@@ -26,7 +26,6 @@ class UpcomingTasksAdapter(tasks: List<Task>, private val onTaskClicked: (Task) 
     inner class UpcomingTaskViewHolder(private val binding: ItemUpcomingTaskBinding) : RecyclerView.ViewHolder(binding.root) {
         fun bind(task: Task) {
             binding.taskName.text = task.name
-            binding.groupName.text = task.groupName
 
             val diff = task.dueDate - System.currentTimeMillis()
             val days = TimeUnit.MILLISECONDS.toDays(diff)

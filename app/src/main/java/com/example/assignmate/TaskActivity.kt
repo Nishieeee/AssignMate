@@ -9,14 +9,12 @@ import com.example.assignmate.model.Task
 class TaskActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityTaskBinding
-    private lateinit var databaseHelper: DatabaseHelper
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityTaskBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        databaseHelper = DatabaseHelper(this)
         setupRecyclerView()
     }
 

@@ -15,16 +15,14 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.example.assignmate.adapter.FavouriteGroupAdapter
 import com.example.assignmate.adapter.UpcomingTasksAdapter
 import com.example.assignmate.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
-    private lateinit var databaseHelper: DatabaseHelper
-    private lateinit var notificationHelper: NotificationHelper
-    private var currentUserId: Int = -1
+    private lateinit var firebaseHelper: FirebaseHelper
+    private var currentUserId: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,11 +30,9 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        databaseHelper = DatabaseHelper(this)
-        notificationHelper = NotificationHelper(this)
-        notificationHelper.createNotificationChannel()
+        firebaseHelper = FirebaseHelper()
 
-        currentUserId = intent.getIntExtra("USER_ID", -1)
+        currentUserId = intent.getStringExtra("USER_ID") ?: ""
 
         binding.notificationBell.setOnClickListener {
             val intent = Intent(this, NotificationsActivity::class.java)
@@ -77,70 +73,55 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateUserInfo() {
-        val userDetails = databaseHelper.getUserDetails(currentUserId)
-        if (userDetails != null) {
-            binding.welcomeMessage.text = "Welcome back, ${userDetails.first}!"
-        } else {
-            binding.welcomeMessage.text = "Welcome back, User!"
-        }
-
-        val groupCount = databaseHelper.getGroupsForUser(currentUserId).size
-        binding.totalGroups.text = groupCount.toString()
-
-        val totalTasks = databaseHelper.getTotalTasksForUser(currentUserId)
-        binding.totalTasks.text = totalTasks.toString()
-
-        val pendingTasks = databaseHelper.getPendingTasksForUser(currentUserId)
-        binding.pendingTasks.text = pendingTasks.toString()
-
-        val dueTasks = databaseHelper.getDueTasksForUser(currentUserId)
-        binding.dueTasks.text = dueTasks.toString()
-
-        val upcomingTasks = databaseHelper.getUpcomingTasksForUser(currentUserId)
-        if (upcomingTasks.isEmpty()) {
-            binding.upcomingDeadlinesRecyclerView.visibility = View.GONE
-            binding.noUpcomingDeadlinesText.visibility = View.VISIBLE
-        } else {
-            binding.upcomingDeadlinesRecyclerView.visibility = View.VISIBLE
-            binding.noUpcomingDeadlinesText.visibility = View.GONE
-            binding.upcomingDeadlinesRecyclerView.adapter = UpcomingTasksAdapter(upcomingTasks) { task ->
-                val intent = Intent(this, TaskDetailActivity::class.java)
-                intent.putExtra("TASK_ID", task.id)
-                intent.putExtra("USER_ID", currentUserId)
-                startActivity(intent)
+        firebaseHelper.getUserDetails(currentUserId,
+            onSuccess = {
+                if (it != null) {
+                    binding.welcomeMessage.text = "Welcome back, ${it.username}!"
+                } else {
+                    binding.welcomeMessage.text = "Welcome back, User!"
+                }
+            },
+            onFailure = {
+                binding.welcomeMessage.text = "Welcome back, User!"
             }
-        }
+        )
 
-        updateFavouriteGroups()
-        updateNotificationBadge()
-    }
+        firebaseHelper.getGroupsForUser(currentUserId,
+            onSuccess = { binding.totalGroups.text = it.size.toString() },
+            onFailure = { binding.totalGroups.text = "0" }
+        )
 
-    private fun updateNotificationBadge() {
-        val unreadCount = databaseHelper.getUnreadNotificationCount(currentUserId)
-        if (unreadCount > 0) {
-            binding.notificationBadge.visibility = View.VISIBLE
-            binding.notificationBadge.text = unreadCount.toString()
-        } else {
-            binding.notificationBadge.visibility = View.GONE
-        }
-    }
+        firebaseHelper.getTotalTasksForUser(currentUserId,
+            onSuccess = { binding.totalTasks.text = it.toString() },
+            onFailure = { binding.totalTasks.text = "0" }
+        )
 
-    private fun updateFavouriteGroups() {
-        val favouriteGroups = databaseHelper.getFavouriteGroups(currentUserId)
-        if (favouriteGroups.isEmpty()) {
-            binding.favouriteGroupsRecyclerView.visibility = View.GONE
-            binding.noFavouriteGroupText.visibility = View.VISIBLE
-        } else {
-            binding.favouriteGroupsRecyclerView.visibility = View.VISIBLE
-            binding.noFavouriteGroupText.visibility = View.GONE
-            binding.favouriteGroupsRecyclerView.layoutManager = LinearLayoutManager(this)
-            binding.favouriteGroupsRecyclerView.adapter = FavouriteGroupAdapter(favouriteGroups) { group ->
-                val intent = Intent(this, SingleGroupActivity::class.java)
-                intent.putExtra("GROUP_ID", group.id)
-                intent.putExtra("USER_ID", currentUserId)
-                startActivity(intent)
+        firebaseHelper.getPendingTasksForUser(currentUserId,
+            onSuccess = { binding.pendingTasks.text = it.toString() },
+            onFailure = { binding.pendingTasks.text = "0" }
+        )
+
+        firebaseHelper.getUpcomingTasksForUser(currentUserId,
+            onSuccess = {
+                if (it.isEmpty()) {
+                    binding.upcomingDeadlinesRecyclerView.visibility = View.GONE
+                    binding.noUpcomingDeadlinesText.visibility = View.VISIBLE
+                } else {
+                    binding.upcomingDeadlinesRecyclerView.visibility = View.VISIBLE
+                    binding.noUpcomingDeadlinesText.visibility = View.GONE
+                    binding.upcomingDeadlinesRecyclerView.adapter = UpcomingTasksAdapter(it) { task ->
+                        val intent = Intent(this, TaskDetailActivity::class.java)
+                        intent.putExtra("TASK_ID", task.uid)
+                        intent.putExtra("USER_ID", currentUserId)
+                        startActivity(intent)
+                    }
+                }
+            },
+            onFailure = {
+                binding.upcomingDeadlinesRecyclerView.visibility = View.GONE
+                binding.noUpcomingDeadlinesText.visibility = View.VISIBLE
             }
-        }
+        )
     }
 
     private fun showCreateGroupDialog() {
@@ -160,12 +141,12 @@ class MainActivity : AppCompatActivity() {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
 
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                if (!s.isNullOrEmpty() && groupCodeText.text.contains("will appear")) {
+                if (!s.isNullOrEmpty()) {
                     val groupCode = generateGroupCode()
                     groupCodeText.text = "Group Code: $groupCode"
                     copyCodeButton.visibility = View.VISIBLE
                 } else if (s.isNullOrEmpty()) {
-                    groupCodeText.text = "Group Code will appear here"
+                    groupCodeText.text = "Group Code: "
                     copyCodeButton.visibility = View.GONE
                 }
             }
@@ -186,20 +167,21 @@ class MainActivity : AppCompatActivity() {
             val groupDescription = groupDescriptionInput.text.toString()
             val groupCode = groupCodeText.text.toString().substringAfter("Group Code: ")
 
-            if (groupName.isNotEmpty() && groupDescription.isNotEmpty() && groupCode.length == 6) {
-                val newGroupId = databaseHelper.createGroup(groupName, groupDescription, currentUserId, groupCode)
-                if (newGroupId != -1L) {
-                    Toast.makeText(this, "Group created successfully", Toast.LENGTH_SHORT).show()
-                    notificationHelper.sendNotification(currentUserId, "New Group", "You have created a new group: $groupName", newGroupId.toInt())
-                    val intent = Intent(this, SingleGroupActivity::class.java)
-                    intent.putExtra("GROUP_ID", newGroupId)
-                    intent.putExtra("USER_ID", currentUserId)
-                    startActivity(intent)
-                } else {
-                    Toast.makeText(this, "Failed to create group. The code might already exist.", Toast.LENGTH_SHORT).show()
-                }
+            if (groupName.isNotEmpty() && groupCode.length == 6) {
+                firebaseHelper.createGroup(groupName, groupDescription, currentUserId, groupCode,
+                    onSuccess = {
+                        Toast.makeText(this, "Group created successfully", Toast.LENGTH_SHORT).show()
+                        val intent = Intent(this, SingleGroupActivity::class.java)
+                        intent.putExtra("GROUP_ID", it)
+                        intent.putExtra("USER_ID", currentUserId)
+                        startActivity(intent)
+                    },
+                    onFailure = {
+                        Toast.makeText(this, "Failed to create group. The code might already exist.", Toast.LENGTH_SHORT).show()
+                    }
+                )
             } else {
-                Toast.makeText(this, "Please fill out all fields", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Please enter a group name", Toast.LENGTH_SHORT).show()
             }
         }
 
@@ -226,21 +208,15 @@ class MainActivity : AppCompatActivity() {
         dialog.setButton(AlertDialog.BUTTON_POSITIVE, "Join") { _, _ ->
             val groupCode = groupCodeInput.text.toString()
             if (groupCode.isNotEmpty()) {
-                val groupId = databaseHelper.getGroupIdByCode(groupCode)
-                if (groupId != -1L) {
-                    if (databaseHelper.joinGroup(currentUserId, groupCode)) {
+                firebaseHelper.joinGroup(groupCode, currentUserId,
+                    onSuccess = {
                         Toast.makeText(this, "Group Joined Successfully", Toast.LENGTH_SHORT).show()
-                        notificationHelper.sendNotification(currentUserId, "Joined Group", "You have joined a new group.", groupId.toInt())
-                        val intent = Intent(this, SingleGroupActivity::class.java)
-                        intent.putExtra("GROUP_ID", groupId)
-                        intent.putExtra("USER_ID", currentUserId)
-                        startActivity(intent)
-                    } else {
-                        Toast.makeText(this, "Failed to join group", Toast.LENGTH_SHORT).show()
+                        updateUserInfo()
+                    },
+                    onFailure = {
+                        Toast.makeText(this, it.message, Toast.LENGTH_SHORT).show()
                     }
-                } else {
-                    Toast.makeText(this, "Invalid Group Code", Toast.LENGTH_SHORT).show()
-                }
+                )
             } else {
                 Toast.makeText(this, "Please enter a group code", Toast.LENGTH_SHORT).show()
             }

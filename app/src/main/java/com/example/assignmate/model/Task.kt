@@ -1,12 +1,13 @@
 package com.example.assignmate.model
 
+import com.google.firebase.firestore.DocumentId
+
 data class Task(
-    val id: Long,
-    val name: String,
-    val description: String,
-    val groupId: Long,
-    val groupName: String? = null,
-    val dueDate: Long,
-    val status: String,
-    val assignedTo: List<Int>? = null
+    @DocumentId val uid: String = "",
+    val name: String = "",
+    val description: String = "",
+    val groupId: String = "",
+    val dueDate: Long = 0,
+    val status: String = "",
+    val assignedTo: List<String> = emptyList()
 )

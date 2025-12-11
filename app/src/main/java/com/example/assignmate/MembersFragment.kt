@@ -14,9 +14,9 @@ import com.example.assignmate.model.Member
 
 class MembersFragment : Fragment() {
 
-    private lateinit var databaseHelper: DatabaseHelper
-    private var groupId: Long = -1
-    private var currentUserId: Int = -1
+    private lateinit var firebaseHelper: FirebaseHelper
+    private var groupId: String = ""
+    private var currentUserId: String = ""
 
     private lateinit var membersRecyclerView: RecyclerView
     private lateinit var memberAdapter: MembersAdapter
@@ -24,10 +24,10 @@ class MembersFragment : Fragment() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         arguments?.let {
-            groupId = it.getLong(ARG_GROUP_ID)
-            currentUserId = it.getInt(ARG_CURRENT_USER_ID)
+            groupId = it.getString(ARG_GROUP_ID) ?: ""
+            currentUserId = it.getString(ARG_CURRENT_USER_ID) ?: ""
         }
-        databaseHelper = DatabaseHelper(requireContext())
+        firebaseHelper = FirebaseHelper()
     }
 
     override fun onCreateView(
@@ -44,13 +44,18 @@ class MembersFragment : Fragment() {
     }
 
     fun loadMembers() {
-        val members = databaseHelper.getGroupMembers(groupId)
-        val currentUserRole = databaseHelper.getRoleForUserInGroup(currentUserId, groupId) ?: "member"
-
-        memberAdapter = MembersAdapter(members, currentUserRole) { member, action ->
-            handleMemberAction(member, action)
-        }
-        membersRecyclerView.adapter = memberAdapter
+        firebaseHelper.getGroupMembers(groupId,
+            onSuccess = {
+                val currentUser = it.find { member -> member.id == currentUserId }
+                memberAdapter = MembersAdapter(it, currentUser?.role ?: "member") { member, action ->
+                    handleMemberAction(member, action)
+                }
+                membersRecyclerView.adapter = memberAdapter
+            },
+            onFailure = {
+                Toast.makeText(requireContext(), "Failed to load members", Toast.LENGTH_SHORT).show()
+            }
+        )
     }
 
     private fun handleMemberAction(member: Member, action: String) {
@@ -62,12 +67,15 @@ class MembersFragment : Fragment() {
     }
 
     private fun updateMemberRole(member: Member, role: String, message: String) {
-        if (databaseHelper.updateMemberRole(groupId, member.id, role)) {
-            Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
-            loadMembers()
-        } else {
-            Toast.makeText(requireContext(), "Failed to update role", Toast.LENGTH_SHORT).show()
-        }
+        firebaseHelper.updateMemberRole(groupId, member.id, role,
+            onSuccess = {
+                Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
+                loadMembers()
+            },
+            onFailure = {
+                Toast.makeText(requireContext(), "Failed to update role", Toast.LENGTH_SHORT).show()
+            }
+        )
     }
 
     private fun showRemoveMemberConfirmationDialog(member: Member) {
@@ -75,12 +83,15 @@ class MembersFragment : Fragment() {
             .setTitle("Remove Member")
             .setMessage("Are you sure you want to remove ${member.name} from the group?")
             .setPositiveButton("Remove") { _, _ ->
-                if (databaseHelper.removeMemberFromGroup(groupId, member.id)) {
-                    Toast.makeText(requireContext(), "Member removed", Toast.LENGTH_SHORT).show()
-                    loadMembers()
-                } else {
-                    Toast.makeText(requireContext(), "Failed to remove member", Toast.LENGTH_SHORT).show()
-                }
+                firebaseHelper.removeMemberFromGroup(groupId, member.id,
+                    onSuccess = {
+                        Toast.makeText(requireContext(), "Member removed", Toast.LENGTH_SHORT).show()
+                        loadMembers()
+                    },
+                    onFailure = {
+                        Toast.makeText(requireContext(), "Failed to remove member", Toast.LENGTH_SHORT).show()
+                    }
+                )
             }
             .setNegativeButton("Cancel", null)
             .show()
@@ -91,11 +102,11 @@ class MembersFragment : Fragment() {
         private const val ARG_CURRENT_USER_ID = "CURRENT_USER_ID"
 
         @JvmStatic
-        fun newInstance(groupId: Long, currentUserId: Int) =
+        fun newInstance(groupId: String, currentUserId: String) =
             MembersFragment().apply {
                 arguments = Bundle().apply {
-                    putLong(ARG_GROUP_ID, groupId)
-                    putInt(ARG_CURRENT_USER_ID, currentUserId)
+                    putString(ARG_GROUP_ID, groupId)
+                    putString(ARG_CURRENT_USER_ID, currentUserId)
                 }
             }
     }

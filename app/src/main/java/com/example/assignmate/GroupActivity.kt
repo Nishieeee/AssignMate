@@ -17,31 +17,26 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.assignmate.adapter.GroupAdapter
 import com.example.assignmate.databinding.ActivityGroupBinding
-import com.example.assignmate.model.Group
 import com.google.android.material.bottomnavigation.BottomNavigationView
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class GroupActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItemSelectedListener {
 
     private lateinit var binding: ActivityGroupBinding
-    private lateinit var databaseHelper: DatabaseHelper
+    private lateinit var firebaseHelper: FirebaseHelper
     private lateinit var groupAdapter: GroupAdapter
-    private val groups = mutableListOf<Group>()
-    private var currentUserId: Int = -1
+    private val groups = mutableListOf<com.example.assignmate.model.Group>()
+    private var currentUserId: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityGroupBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        databaseHelper = DatabaseHelper(this)
-        currentUserId = intent.getIntExtra("USER_ID", -1)
+        firebaseHelper = FirebaseHelper()
+        currentUserId = intent.getStringExtra("USER_ID") ?: ""
 
         setupRecyclerView()
         setupFilterAndSort()
@@ -65,7 +60,7 @@ class GroupActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItem
     override fun onResume() {
         super.onResume()
         loadGroups()
-        updateNotificationBadge()
+        // updateNotificationBadge()
     }
 
     private fun setupFilterAndSort(){
@@ -88,23 +83,23 @@ class GroupActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItem
         }
     }
 
-    private fun updateNotificationBadge() {
-        val notificationBadge = findViewById<TextView>(R.id.notification_badge)
-        val unreadCount = databaseHelper.getUnreadNotificationCount(currentUserId)
-        if (unreadCount > 0) {
-            notificationBadge.visibility = View.VISIBLE
-            notificationBadge.text = unreadCount.toString()
-        } else {
-            notificationBadge.visibility = View.GONE
-        }
-    }
+//    private fun updateNotificationBadge() {
+//        val notificationBadge = findViewById<TextView>(R.id.notification_badge)
+//        val unreadCount = databaseHelper.getUnreadNotificationCount(currentUserId)
+//        if (unreadCount > 0) {
+//            notificationBadge.visibility = View.VISIBLE
+//            notificationBadge.text = unreadCount.toString()
+//        } else {
+//            notificationBadge.visibility = View.GONE
+//        }
+//    }
 
     private fun setupRecyclerView() {
         groupAdapter = GroupAdapter(groups, currentUserId,
             onGroupClicked = { group ->
                 val intent = Intent(this, SingleGroupActivity::class.java)
                 intent.putExtra("GROUP_NAME", group.name)
-                intent.putExtra("GROUP_ID", group.id)
+                intent.putExtra("GROUP_ID", group.uid)
                 intent.putExtra("USER_ID", currentUserId)
                 startActivity(intent)
             },
@@ -115,13 +110,13 @@ class GroupActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItem
                 showDeleteGroupConfirmationDialog(group)
             },
             onFavouriteClicked = { group ->
-                if (group.isFavourite) {
-                    databaseHelper.removeFavouriteGroup(currentUserId, group.id)
-                    Toast.makeText(this, "\"${group.name}\" removed from favourites", Toast.LENGTH_SHORT).show()
-                } else {
-                    databaseHelper.addFavouriteGroup(currentUserId, group.id)
-                    Toast.makeText(this, "\"${group.name}\" added to favourites", Toast.LENGTH_SHORT).show()
-                }
+//                if (group.isFavourite) {
+//                    databaseHelper.removeFavouriteGroup(currentUserId, group.id)
+//                    Toast.makeText(this, "\"${group.name}\" removed from favourites", Toast.LENGTH_SHORT).show()
+//                } else {
+//                    databaseHelper.addFavouriteGroup(currentUserId, group.id)
+//                    Toast.makeText(this, "\"${group.name}\" added to favourites", Toast.LENGTH_SHORT).show()
+//                }
                 loadGroups()
             }
         )
@@ -132,29 +127,15 @@ class GroupActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItem
     }
 
     private fun loadGroups() {
-        val selection = binding.filterDropdown.text.toString()
-        val sortBy = when (selection) {
-            "Last Updated" -> "last_updated"
-            "Most Tasks Assigned" -> "most_tasks"
-            else -> "date" // Default sort by date
-        }
-        val onlyFavourites = selection == "Favourite"
-
-        lifecycleScope.launch(Dispatchers.IO) {
-            val userGroups = if (onlyFavourites) {
-                databaseHelper.getFavouriteGroups(currentUserId)
-            } else {
-                databaseHelper.getGroupsForUser(currentUserId, sortBy)
-            }
-
-            withContext(Dispatchers.Main) {
-                groupAdapter.setGroups(userGroups)
-                // Apply current search query after loading
-                val query = binding.searchInput.text.toString()
-                groupAdapter.filter(query)
+        firebaseHelper.getGroupsForUser(currentUserId,
+            onSuccess = {
+                groupAdapter.setGroups(it)
                 updateUI()
+            },
+            onFailure = {
+                Toast.makeText(this, "Failed to load groups", Toast.LENGTH_SHORT).show()
             }
-        }
+        )
     }
 
     private fun updateUI() {
@@ -211,16 +192,18 @@ class GroupActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItem
             val groupCode = groupCodeText.text.toString().substringAfter("Group Code: ")
 
             if (groupName.isNotEmpty() && groupCode.length == 6) {
-                val newGroupId = databaseHelper.createGroup(groupName, groupDescription, currentUserId, groupCode)
-                if (newGroupId != -1L) {
-                    Toast.makeText(this, "Group created successfully", Toast.LENGTH_SHORT).show()
-                    val intent = Intent(this, SingleGroupActivity::class.java)
-                    intent.putExtra("GROUP_ID", newGroupId)
-                    intent.putExtra("USER_ID", currentUserId)
-                    startActivity(intent)
-                } else {
-                    Toast.makeText(this, "Failed to create group. The code might already exist.", Toast.LENGTH_SHORT).show()
-                }
+                firebaseHelper.createGroup(groupName, groupDescription, currentUserId, groupCode,
+                    onSuccess = {
+                        Toast.makeText(this, "Group created successfully", Toast.LENGTH_SHORT).show()
+                        val intent = Intent(this, SingleGroupActivity::class.java)
+                        intent.putExtra("GROUP_ID", it)
+                        intent.putExtra("USER_ID", currentUserId)
+                        startActivity(intent)
+                    },
+                    onFailure = {
+                        Toast.makeText(this, "Failed to create group. The code might already exist.", Toast.LENGTH_SHORT).show()
+                    }
+                )
             } else {
                 Toast.makeText(this, "Please enter a group name", Toast.LENGTH_SHORT).show()
             }
@@ -249,20 +232,15 @@ class GroupActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItem
         dialog.setButton(AlertDialog.BUTTON_POSITIVE, "Join") { _, _ ->
             val groupCode = groupCodeInput.text.toString()
             if (groupCode.isNotEmpty()) {
-                val groupId = databaseHelper.getGroupIdByCode(groupCode)
-                if (groupId != -1L) {
-                    if (databaseHelper.joinGroup(currentUserId, groupCode)) {
+                firebaseHelper.joinGroup(groupCode, currentUserId,
+                    onSuccess = {
                         Toast.makeText(this, "Group Joined Successfully", Toast.LENGTH_SHORT).show()
-                        val intent = Intent(this, SingleGroupActivity::class.java)
-                        intent.putExtra("GROUP_ID", groupId)
-                        intent.putExtra("USER_ID", currentUserId)
-                        startActivity(intent)
-                    } else {
-                        Toast.makeText(this, "Failed to join group", Toast.LENGTH_SHORT).show()
+                        loadGroups()
+                    },
+                    onFailure = {
+                        Toast.makeText(this, it.message, Toast.LENGTH_SHORT).show()
                     }
-                } else {
-                    Toast.makeText(this, "Invalid Group Code", Toast.LENGTH_SHORT).show()
-                }
+                )
             } else {
                 Toast.makeText(this, "Please enter a group code", Toast.LENGTH_SHORT).show()
             }
@@ -278,7 +256,7 @@ class GroupActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItem
         dialog.show()
     }
 
-    private fun showEditGroupDialog(group: Group) {
+    private fun showEditGroupDialog(group: com.example.assignmate.model.Group) {
         val builder = AlertDialog.Builder(this)
         val view = layoutInflater.inflate(R.layout.dialog_create_group, null)
         builder.setView(view)
@@ -302,12 +280,15 @@ class GroupActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItem
             val newGroupDescription = groupDescriptionInput.text.toString()
 
             if (newGroupName.isNotEmpty()) {
-                if (databaseHelper.updateGroup(group.id, newGroupName, newGroupDescription)) {
-                    Toast.makeText(this, "Group updated successfully", Toast.LENGTH_SHORT).show()
-                    loadGroups()
-                } else {
-                    Toast.makeText(this, "Failed to update group", Toast.LENGTH_SHORT).show()
-                }
+                firebaseHelper.updateGroup(group.uid, newGroupName, newGroupDescription,
+                    onSuccess = {
+                        Toast.makeText(this, "Group updated successfully", Toast.LENGTH_SHORT).show()
+                        loadGroups()
+                    },
+                    onFailure = {
+                        Toast.makeText(this, "Failed to update group", Toast.LENGTH_SHORT).show()
+                    }
+                )
             } else {
                 Toast.makeText(this, "Group name cannot be empty", Toast.LENGTH_SHORT).show()
             }
@@ -318,17 +299,20 @@ class GroupActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItem
         dialog.show()
     }
 
-    private fun showDeleteGroupConfirmationDialog(group: Group) {
+    private fun showDeleteGroupConfirmationDialog(group: com.example.assignmate.model.Group) {
         AlertDialog.Builder(this)
             .setTitle("Delete Group")
             .setMessage("Are you sure you want to delete \"${group.name}\"?")
             .setPositiveButton("Delete") { _, _ ->
-                if (databaseHelper.deleteGroup(group.id)) {
-                    Toast.makeText(this, "Group deleted", Toast.LENGTH_SHORT).show()
-                    loadGroups()
-                } else {
-                    Toast.makeText(this, "Failed to delete group", Toast.LENGTH_SHORT).show()
-                }
+                firebaseHelper.deleteGroup(group.uid,
+                    onSuccess = {
+                        Toast.makeText(this, "Group deleted", Toast.LENGTH_SHORT).show()
+                        loadGroups()
+                    },
+                    onFailure = {
+                        Toast.makeText(this, "Failed to delete group", Toast.LENGTH_SHORT).show()
+                    }
+                )
             }
             .setNegativeButton("Cancel", null)
             .show()

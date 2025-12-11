@@ -1,10 +1,12 @@
 package com.example.assignmate.model
 
+import com.google.firebase.firestore.DocumentId
+
 data class Notification(
-    val id: Long,
-    val userId: Int,
-    val title: String,
-    val message: String,
-    val timestamp: Long,
+    @DocumentId val id: String = "",
+    val userId: String = "",
+    val title: String = "",
+    val message: String = "",
+    val timestamp: Long = 0,
     val isRead: Boolean = false
 )

@@ -3,25 +3,25 @@ package com.example.assignmate
 import android.app.Activity
 import android.app.DatePickerDialog
 import android.content.DialogInterface
-import android.content.res.ColorStateList
-import android.graphics.Color
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
 import com.example.assignmate.adapter.CommentAdapter
-import com.example.assignmate.adapter.SelectableLabelAdapter
 import com.example.assignmate.adapter.SubtaskAdapter
 import com.example.assignmate.databinding.ActivityTaskDetailBinding
+import com.example.assignmate.model.Comment
+import com.example.assignmate.model.Subtask
 import com.example.assignmate.model.Task
 import com.google.android.material.chip.Chip
 import java.text.SimpleDateFormat
@@ -31,12 +31,9 @@ import java.util.Locale
 class TaskDetailActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityTaskDetailBinding
-    private lateinit var databaseHelper: DatabaseHelper
-    private lateinit var notificationHelper: NotificationHelper
-    private var taskId: Long = -1
-    private var currentUserId: Int = -1
-    private var groupLeaderId: Int = -1
-    private var isAssigned: Boolean = false
+    private lateinit var firebaseHelper: FirebaseHelper
+    private var taskId: String = ""
+    private var currentUserId: String = ""
     private var originalTask: Task? = null
     private var modifiedTask: Task? = null
     private var hasUnsavedChanges = false
@@ -48,30 +45,59 @@ class TaskDetailActivity : AppCompatActivity() {
         binding = ActivityTaskDetailBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        databaseHelper = DatabaseHelper(this)
-        notificationHelper = NotificationHelper(this)
-        taskId = intent.getLongExtra("TASK_ID", -1)
-        currentUserId = intent.getIntExtra("USER_ID", -1)
+        firebaseHelper = FirebaseHelper()
+        taskId = intent.getStringExtra("TASK_ID") ?: ""
+        currentUserId = intent.getStringExtra("USER_ID") ?: ""
 
-        originalTask = databaseHelper.getTask(taskId)
-        if (originalTask == null) {
-            finish()
-            return
-        }
-        modifiedTask = originalTask?.copy(
-            assignedTo = originalTask?.assignedTo?.toMutableList()
-        )
-
-        groupLeaderId = databaseHelper.getGroupLeaderId(originalTask!!.groupId)
-        isAssigned = originalTask!!.assignedTo?.contains(currentUserId) == true
-        currentUserRole = databaseHelper.getRoleForUserInGroup(currentUserId, originalTask!!.groupId)
-
+        loadTask()
         setupToolbar()
-        setupViews()
         setupListeners()
         loadComments()
         loadSubtasks()
-        updateLabelChips()
+
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (hasUnsavedChanges) {
+                    showUnsavedChangesDialog()
+                } else {
+                    finish()
+                }
+            }
+        })
+    }
+
+    private fun showUnsavedChangesDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Unsaved Changes")
+            .setMessage("Do you want to save the changes?")
+            .setPositiveButton("Save") { _, _ -> saveChanges() }
+            .setNegativeButton("Discard") { _, _ -> finish() }
+            .setNeutralButton("Cancel", null)
+            .show()
+    }
+
+
+    private fun loadTask() {
+        firebaseHelper.getTask(taskId,
+            onSuccess = {
+                if (it == null) {
+                    finish()
+                    return@getTask
+                }
+                originalTask = it
+                modifiedTask = originalTask?.copy(
+                    assignedTo = originalTask?.assignedTo?.toMutableList() ?: mutableListOf()
+                )
+                firebaseHelper.getGroup(originalTask!!.groupId,
+                    onSuccess = { group ->
+                        currentUserRole = group?.members?.get(currentUserId)
+                        setupViews()
+                    },
+                    onFailure = { finish() }
+                )
+            },
+            onFailure = { finish() }
+        )
     }
 
     private fun setupToolbar() {
@@ -90,13 +116,14 @@ class TaskDetailActivity : AppCompatActivity() {
         setStatusColor(originalTask!!.status)
 
         val canManageTask = currentUserRole == "leader" || currentUserRole == "co-leader"
+        val isAssigned = originalTask!!.assignedTo.contains(currentUserId)
 
         binding.statusDropdown.isEnabled = canManageTask || isAssigned
         binding.taskTitleInput.isEnabled = canManageTask
         binding.taskDescriptionInput.isEnabled = canManageTask
         binding.dueDateInput.isEnabled = canManageTask
         binding.addAssigneeIcon.isEnabled = canManageTask
-        binding.addLabelIcon.isEnabled = canManageTask
+        binding.addLabelIcon.visibility = View.GONE
         binding.addSubtaskButton.isEnabled = canManageTask
 
         if (originalTask!!.dueDate != 0L) {
@@ -110,50 +137,24 @@ class TaskDetailActivity : AppCompatActivity() {
 
     private fun updateAssignedMembersChips() {
         binding.assignedMembersChipGroup.removeAllViews()
-        val assignedMembers = databaseHelper.getGroupMembers(originalTask!!.groupId).filter { modifiedTask!!.assignedTo?.contains(it.id) == true }
-        for (member in assignedMembers) {
-            val chip = Chip(this)
-            chip.text = member.name
-            chip.isCloseIconVisible = true
-            chip.setOnCloseIconClickListener {
-                (modifiedTask?.assignedTo as? MutableList)?.remove(member.id)
-                updateAssignedMembersChips()
-                checkForChanges()
-            }
-            binding.assignedMembersChipGroup.addView(chip)
-        }
-    }
-
-    private fun updateLabelChips() {
-        binding.labelsChipGroup.removeAllViews()
-        val assignedLabels = databaseHelper.getLabelsForTask(taskId)
-
-        for (label in assignedLabels) {
-            val chip = Chip(this)
-            chip.text = label.name
-            chip.isCloseIconVisible = true
-
-            try {
-                val color = Color.parseColor(label.color)
-                chip.chipBackgroundColor = ColorStateList.valueOf(color)
-
-                val luminance = (0.299 * Color.red(color) + 0.587 * Color.green(color) + 0.114 * Color.blue(color)) / 255
-                if (luminance > 0.5) {
-                    chip.setTextColor(Color.BLACK)
-                } else {
-                    chip.setTextColor(Color.WHITE)
-                }
-            } catch (e: IllegalArgumentException) {
-                chip.chipBackgroundColor = ColorStateList.valueOf(Color.LTGRAY)
-                chip.setTextColor(Color.BLACK)
-            }
-
-            chip.setOnCloseIconClickListener {
-                databaseHelper.removeTaskLabel(taskId, label.id)
-                updateLabelChips()
-                checkForChanges()
-            }
-            binding.labelsChipGroup.addView(chip)
+        originalTask?.let {
+            firebaseHelper.getGroupMembers(it.groupId,
+                onSuccess = { members ->
+                    val assignedMembers = members.filter { member -> modifiedTask?.assignedTo?.contains(member.id) == true }
+                    for (member in assignedMembers) {
+                        val chip = Chip(this)
+                        chip.text = member.name
+                        chip.isCloseIconVisible = true
+                        chip.setOnCloseIconClickListener {
+                            (modifiedTask?.assignedTo as? MutableList)?.remove(member.id)
+                            updateAssignedMembersChips()
+                            checkForChanges()
+                        }
+                        binding.assignedMembersChipGroup.addView(chip)
+                    }
+                },
+                onFailure = {}
+            )
         }
     }
 
@@ -180,10 +181,6 @@ class TaskDetailActivity : AppCompatActivity() {
             }
         }
 
-        binding.addLabelIcon.setOnClickListener {
-            showSelectLabelsDialog()
-        }
-
         binding.addSubtaskButton.setOnClickListener {
             showAddSubtaskDialog()
         }
@@ -191,14 +188,21 @@ class TaskDetailActivity : AppCompatActivity() {
         binding.addCommentButton.setOnClickListener {
             val commentText = binding.commentInput.text.toString()
             if (commentText.isNotEmpty()) {
-                val newCommentId = databaseHelper.addComment(taskId, currentUserId, commentText)
-                if (newCommentId != -1L) {
-                    loadComments()
-                    binding.commentInput.text?.clear()
-                    notifyUsersOfComment()
-                } else {
-                    Toast.makeText(this, "Failed to add comment", Toast.LENGTH_SHORT).show()
-                }
+                val comment = Comment(
+                    taskId = taskId,
+                    userId = currentUserId,
+                    commentText = commentText,
+                    timestamp = System.currentTimeMillis()
+                )
+                firebaseHelper.addComment(comment,
+                    onSuccess = {
+                        loadComments()
+                        binding.commentInput.text?.clear()
+                    },
+                    onFailure = {
+                        Toast.makeText(this, "Failed to add comment", Toast.LENGTH_SHORT).show()
+                    }
+                )
             }
         }
     }
@@ -215,20 +219,14 @@ class TaskDetailActivity : AppCompatActivity() {
         val currentTitle = binding.taskTitleInput.text.toString()
         val currentDescription = binding.taskDescriptionInput.text.toString()
 
-        val originalLabelIds = originalTask?.let { databaseHelper.getLabelsForTask(it.id).map { l -> l.id }.toSet() } ?: emptySet<Long>()
-        val currentLabelIds = databaseHelper.getLabelsForTask(taskId).map { it.id }.toSet()
-        val labelsChanged = originalLabelIds != currentLabelIds
-
         hasUnsavedChanges = originalTask?.name != currentTitle ||
                 originalTask?.description != currentDescription ||
                 originalTask?.status != modifiedTask?.status ||
                 originalTask?.dueDate != modifiedTask?.dueDate ||
-                originalTask?.assignedTo?.toSet() != modifiedTask?.assignedTo?.toSet() ||
-                labelsChanged
+                originalTask?.assignedTo?.toSet() != modifiedTask?.assignedTo?.toSet()
 
         invalidateOptionsMenu()
     }
-
 
     private fun showDatePickerDialog() {
         val calendar = Calendar.getInstance()
@@ -258,53 +256,36 @@ class TaskDetailActivity : AppCompatActivity() {
     }
 
     private fun showEditAssignmentsDialog() {
-        val members = databaseHelper.getGroupMembers(originalTask!!.groupId)
-        val memberNames = members.map { it.name }.toTypedArray()
-        val selectedMembers = BooleanArray(memberNames.size) {
-            modifiedTask!!.assignedTo?.contains(members[it].id) == true
-        }
-
-        AlertDialog.Builder(this)
-            .setTitle("Assign Members")
-            .setMultiChoiceItems(memberNames, selectedMembers) { _, which, isChecked ->
-                selectedMembers[which] = isChecked
-            }
-            .setPositiveButton("OK") { _, _ ->
-                val newAssignedTo = mutableListOf<Int>()
-                for (i in selectedMembers.indices) {
-                    if (selectedMembers[i]) {
-                        newAssignedTo.add(members[i].id)
+        originalTask?.let {
+            firebaseHelper.getGroupMembers(it.groupId,
+                onSuccess = { members ->
+                    val memberNames = members.map { it.name }.toTypedArray()
+                    val selectedMembers = BooleanArray(members.size) {
+                        modifiedTask?.assignedTo?.contains(members[it].id) == true
                     }
-                }
-                modifiedTask = modifiedTask!!.copy(assignedTo = newAssignedTo)
-                updateAssignedMembersChips()
-                checkForChanges()
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
-    }
 
-    private fun showSelectLabelsDialog() {
-        val allLabels = databaseHelper.getAllLabels()
-        val assignedLabelIds = databaseHelper.getLabelsForTask(taskId).map { it.id }.toMutableSet()
-
-        val dialogView = layoutInflater.inflate(R.layout.dialog_select_labels, null)
-        val labelsRecyclerView = dialogView.findViewById<RecyclerView>(R.id.labels_recycler_view)
-        labelsRecyclerView.layoutManager = LinearLayoutManager(this)
-        val adapter = SelectableLabelAdapter(allLabels, assignedLabelIds)
-        labelsRecyclerView.adapter = adapter
-
-        AlertDialog.Builder(this)
-            .setTitle("Select Labels")
-            .setView(dialogView)
-            .setPositiveButton("Save") { _, _ ->
-                val newLabelIds = adapter.getSelectedLabelIds()
-                databaseHelper.updateTaskLabels(taskId, newLabelIds)
-                updateLabelChips()
-                checkForChanges()
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
+                    AlertDialog.Builder(this)
+                        .setTitle("Assign Members")
+                        .setMultiChoiceItems(memberNames, selectedMembers) { _, which, isChecked ->
+                            selectedMembers[which] = isChecked
+                        }
+                        .setPositiveButton("OK") { _, _ ->
+                            val newAssignedTo = mutableListOf<String>()
+                            for (i in selectedMembers.indices) {
+                                if (selectedMembers[i]) {
+                                    newAssignedTo.add(members[i].id)
+                                }
+                            }
+                            modifiedTask = modifiedTask!!.copy(assignedTo = newAssignedTo)
+                            updateAssignedMembersChips()
+                            checkForChanges()
+                        }
+                        .setNegativeButton("Cancel", null)
+                        .show()
+                },
+                onFailure = {}
+            )
+        }
     }
 
     private fun showAddSubtaskDialog() {
@@ -318,12 +299,11 @@ class TaskDetailActivity : AppCompatActivity() {
             val subtaskName = subtaskNameInput.text.toString()
 
             if (subtaskName.isNotEmpty()) {
-                val newSubtaskId = databaseHelper.createSubtask(taskId, subtaskName)
-                if (newSubtaskId != -1L) {
-                    loadSubtasks()
-                } else {
-                    Toast.makeText(this, "Failed to add subtask", Toast.LENGTH_SHORT).show()
-                }
+                val subtask = Subtask(name = subtaskName, taskId = taskId)
+                firebaseHelper.createSubtask(subtask,
+                    onSuccess = { loadSubtasks() },
+                    onFailure = { Toast.makeText(this, "Failed to add subtask", Toast.LENGTH_SHORT).show() }
+                )
             } else {
                 Toast.makeText(this, "Please enter a subtask name", Toast.LENGTH_SHORT).show()
             }
@@ -344,12 +324,23 @@ class TaskDetailActivity : AppCompatActivity() {
 
         val dueDate = if (modifiedTask!!.dueDate == 0L) null else modifiedTask!!.dueDate
 
-        databaseHelper.updateTask(taskId, newTitle, newDescription, dueDate, modifiedTask!!.status, modifiedTask!!.assignedTo)
-        notifyUsersOfChanges()
-        taskUpdated = true
-        hasUnsavedChanges = false
-        Toast.makeText(this, "Changes saved", Toast.LENGTH_SHORT).show()
-        finish()
+        firebaseHelper.updateTask(
+            taskId,
+            newTitle,
+            newDescription,
+            dueDate,
+            modifiedTask!!.status,
+            modifiedTask!!.assignedTo,
+            onSuccess = {
+                taskUpdated = true
+                hasUnsavedChanges = false
+                Toast.makeText(this, "Changes saved", Toast.LENGTH_SHORT).show()
+                finish()
+            },
+            onFailure = {
+                Toast.makeText(this, "Failed to save changes", Toast.LENGTH_SHORT).show()
+            }
+        )
     }
 
     private fun deleteTask() {
@@ -357,46 +348,41 @@ class TaskDetailActivity : AppCompatActivity() {
             .setTitle("Delete Task")
             .setMessage("Are you sure you want to delete this task?")
             .setPositiveButton("Delete") { _, _ ->
-                if (databaseHelper.deleteTask(taskId)) {
-                    Toast.makeText(this, "Task deleted", Toast.LENGTH_SHORT).show()
-                    taskUpdated = true // To trigger a refresh in the previous screen
-                    finish()
-                } else {
-                    Toast.makeText(this, "Failed to delete task", Toast.LENGTH_SHORT).show()
-                }
+                firebaseHelper.deleteTask(taskId,
+                    onSuccess = {
+                        Toast.makeText(this, "Task deleted", Toast.LENGTH_SHORT).show()
+                        taskUpdated = true
+                        finish()
+                    },
+                    onFailure = {
+                        Toast.makeText(this, "Failed to delete task", Toast.LENGTH_SHORT).show()
+                    }
+                )
             }
             .setNegativeButton("Cancel", null)
             .show()
     }
 
-    private fun notifyUsersOfChanges(){
-        originalTask?.assignedTo?.forEach { userId ->
-            if (userId != currentUserId) {
-                notificationHelper.sendNotification(userId, "Task Updated", "The task \"${originalTask!!.name}\" has been updated.", taskId.toInt())
-            }
-        }
-    }
-
-    private fun notifyUsersOfComment(){
-        originalTask?.assignedTo?.forEach { userId ->
-            if (userId != currentUserId) {
-                notificationHelper.sendNotification(userId, "New Comment", "A new comment was added to \"${originalTask!!.name}\".", taskId.toInt())
-            }
-        }
-    }
-
     private fun loadComments() {
-        val comments = databaseHelper.getCommentsForTask(taskId)
-        binding.commentsRecyclerView.layoutManager = LinearLayoutManager(this)
-        binding.commentsRecyclerView.adapter = CommentAdapter(comments)
+        firebaseHelper.getCommentsForTask(taskId,
+            onSuccess = { comments ->
+                binding.commentsRecyclerView.layoutManager = LinearLayoutManager(this)
+                binding.commentsRecyclerView.adapter = CommentAdapter(comments)
+            },
+            onFailure = {}
+        )
     }
 
     private fun loadSubtasks() {
-        val subtasks = databaseHelper.getSubtasksForTask(taskId)
-        binding.subtasksRecyclerView.layoutManager = LinearLayoutManager(this)
-        binding.subtasksRecyclerView.adapter = SubtaskAdapter(subtasks) { subtask, isChecked ->
-            databaseHelper.updateSubtaskStatus(subtask.id, isChecked)
-        }
+        firebaseHelper.getSubtasksForTask(taskId,
+            onSuccess = { subtasks ->
+                binding.subtasksRecyclerView.layoutManager = LinearLayoutManager(this)
+                binding.subtasksRecyclerView.adapter = SubtaskAdapter(subtasks) { subtask, isChecked ->
+                    firebaseHelper.updateSubtaskStatus(subtask.id, isChecked, onSuccess = {}, onFailure = {})
+                }
+            },
+            onFailure = {}
+        )
     }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
@@ -421,24 +407,14 @@ class TaskDetailActivity : AppCompatActivity() {
                 true
             }
             android.R.id.home -> {
-                onBackPressedDispatcher.onBackPressed()
+                if (hasUnsavedChanges) {
+                    showUnsavedChangesDialog()
+                } else {
+                    finish()
+                }
                 true
             }
             else -> super.onOptionsItemSelected(item)
-        }
-    }
-
-    override fun onBackPressed() {
-        if (hasUnsavedChanges) {
-            AlertDialog.Builder(this)
-                .setTitle("Unsaved Changes")
-                .setMessage("Do you want to save the changes?")
-                .setPositiveButton("Save") { _, _ -> saveChanges() }
-                .setNegativeButton("Discard") { _, _ -> finish() }
-                .setNeutralButton("Cancel", null)
-                .show()
-        } else {
-            super.onBackPressed()
         }
     }
 

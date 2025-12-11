@@ -12,9 +12,9 @@ import com.example.assignmate.model.Notification
 class NotificationsActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityNotificationsBinding
-    private lateinit var databaseHelper: DatabaseHelper
+    private lateinit var firebaseHelper: FirebaseHelper
     private lateinit var notificationAdapter: NotificationAdapter
-    private var currentUserId: Int = -1
+    private var currentUserId: String = ""
     private val notifications = mutableListOf<Notification>()
     private var isSelectionMode = false
 
@@ -23,8 +23,8 @@ class NotificationsActivity : AppCompatActivity() {
         binding = ActivityNotificationsBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        databaseHelper = DatabaseHelper(this)
-        currentUserId = intent.getIntExtra("USER_ID", -1)
+        firebaseHelper = FirebaseHelper()
+        currentUserId = intent.getStringExtra("USER_ID") ?: ""
 
         setupToolbar()
         setupRecyclerView()
@@ -40,8 +40,7 @@ class NotificationsActivity : AppCompatActivity() {
         notificationAdapter = NotificationAdapter(
             notifications,
             onMarkAsReadClicked = { notification ->
-                databaseHelper.markNotificationAsRead(notification.id)
-                loadNotifications()
+                firebaseHelper.markNotificationAsRead(notification.id, { loadNotifications() }, {})
             },
             onItemLongClicked = {
                 toggleSelectionMode()
@@ -54,9 +53,11 @@ class NotificationsActivity : AppCompatActivity() {
     }
 
     private fun loadNotifications() {
-        notifications.clear()
-        notifications.addAll(databaseHelper.getNotificationsForUser(currentUserId))
-        notificationAdapter.notifyDataSetChanged()
+        firebaseHelper.getNotificationsForUser(currentUserId, {
+            notifications.clear()
+            notifications.addAll(it)
+            notificationAdapter.notifyDataSetChanged()
+        }, {})
     }
 
     private fun setupClickListeners() {
@@ -104,8 +105,7 @@ class NotificationsActivity : AppCompatActivity() {
             .setTitle("Mark All As Read")
             .setMessage("Are you sure you want to mark all messages as read?")
             .setPositiveButton("Yes") { _, _ ->
-                databaseHelper.markAllNotificationsAsRead(currentUserId)
-                loadNotifications()
+                firebaseHelper.markAllNotificationsAsRead(currentUserId, { loadNotifications() }, {})
             }
             .setNegativeButton("No", null)
             .show()
@@ -117,9 +117,8 @@ class NotificationsActivity : AppCompatActivity() {
             .setMessage("Are you sure you want to delete ${selectedNotifications.size} selected notifications?")
             .setPositiveButton("Delete") { _, _ ->
                 selectedNotifications.forEach { notification ->
-                    databaseHelper.deleteNotification(notification.id)
+                    firebaseHelper.deleteNotification(notification.id, { loadNotifications() }, {})
                 }
-                loadNotifications()
                 toggleSelectionMode()
             }
             .setNegativeButton("Cancel", null)
@@ -131,8 +130,7 @@ class NotificationsActivity : AppCompatActivity() {
             .setTitle("Delete All Notifications")
             .setMessage("Are you sure you want to delete all notifications?")
             .setPositiveButton("Delete") { _, _ ->
-                databaseHelper.deleteAllNotifications(currentUserId)
-                loadNotifications()
+                firebaseHelper.deleteAllNotifications(currentUserId, { loadNotifications() }, {})
                 toggleSelectionMode()
             }
             .setNegativeButton("Cancel", null)

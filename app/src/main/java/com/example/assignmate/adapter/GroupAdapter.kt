@@ -13,7 +13,7 @@ import java.util.Locale
 
 class GroupAdapter(
     private var groups: MutableList<Group>,
-    private val currentUserId: Int,
+    private val currentUserId: String,
     private val onGroupClicked: (Group) -> Unit,
     private val onEditClicked: (Group) -> Unit,
     private val onDeleteClicked: (Group) -> Unit,
@@ -52,7 +52,7 @@ class GroupAdapter(
     inner class GroupViewHolder(private val binding: ItemGroupCardBinding) : RecyclerView.ViewHolder(binding.root) {
         fun bind(group: Group) {
             binding.groupName.text = group.name
-            binding.groupLeader.text = "Group Leader: ${group.leader}"
+            binding.groupLeader.text = "Group Leader: ${group.leaderId}" // This will be updated later
             binding.groupMembers.text = "Members: ${group.members.size}"
             binding.assignedTasks.text = "Assigned Tasks: ${group.assignedTasksCount}"
             binding.groupDescription.text = group.description
@@ -67,19 +67,10 @@ class GroupAdapter(
                 val popup = PopupMenu(view.context, view)
                 popup.menuInflater.inflate(R.menu.group_card_menu, popup.menu)
 
-                val favouriteMenuItem = popup.menu.findItem(R.id.action_add_to_favourite)
-                if (group.isFavourite) {
-                    favouriteMenuItem.title = "Remove from Favourites"
-                } else {
-                    favouriteMenuItem.title = "Add to Favourites"
-                }
+                popup.menu.findItem(R.id.action_add_to_favourite).isVisible = false // Hide favourite button for now
 
                 popup.setOnMenuItemClickListener { menuItem ->
                     when (menuItem.itemId) {
-                        R.id.action_add_to_favourite -> {
-                            onFavouriteClicked(group)
-                            true
-                        }
                         R.id.action_edit_group -> {
                             onEditClicked(group)
                             true

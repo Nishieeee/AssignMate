@@ -1,15 +1,16 @@
 package com.example.assignmate.model
 
+import com.google.firebase.firestore.DocumentId
+
 data class Group(
-    val id: Long,
-    val name: String,
-    val description: String,
-    val code: String,
-    val leader: String,
-    val members: List<String>,
-    val lastUpdated: Long,
-    val progress: Int,
-    val pendingTaskCount: Int,
-    val assignedTasksCount: Int,
-    val isFavourite: Boolean = false
+    @DocumentId val uid: String = "",
+    val name: String = "",
+    val description: String = "",
+    val code: String = "",
+    val leaderId: String = "",
+    val members: Map<String, String> = emptyMap(),
+    val lastUpdated: Long = 0,
+    val progress: Int = 0,
+    val pendingTaskCount: Int = 0,
+    val assignedTasksCount: Int = 0
 )
