@@ -1,112 +1,139 @@
 <?xml version="1.0" encoding="utf-8"?>
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="8dp"
-    app:cardBackgroundColor="#FFFFFF"
-    app:cardCornerRadius="8dp"
-    app:cardElevation="4dp"
-    app:strokeColor="#C7C1B8"
-    app:strokeWidth="1dp">
+    android:layout_marginHorizontal="16dp"
+    android:layout_marginVertical="8dp"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="4dp">
 
-    <LinearLayout
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp">
+        android:layout_height="wrap_content">
 
-        <!-- Header: Icon, Name, Menu -->
-        <LinearLayout
+        <ImageView
+            android:id="@+id/group_image"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:layout_height="120dp"
+            android:scaleType="centerCrop"
+            app:layout_constraintTop_toTopOf="parent"
+            tools:src="@drawable/card_background_1" />
 
-            <ImageView
-                android:id="@+id/group_icon"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:src="@drawable/ic_group"
-                app:tint="#F28A30" />
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="120dp"
+            android:background="@drawable/scrim"
+            app:layout_constraintTop_toTopOf="parent" />
 
-            <TextView
-                android:id="@+id/group_name"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="16dp"
-                android:layout_weight="1"
-                android:text="Group Name"
-                android:textAppearance="@style/TextAppearance.AppCompat.Large"
-                android:textColor="#2C2A28"
-                android:textStyle="bold" />
-
-            <ImageButton
-                android:id="@+id/group_overflow_menu"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="Group Actions"
-                android:src="@drawable/ic_more_vert"
-                app:tint="#AAA39A" />
-        </LinearLayout>
-
-        <!-- Description -->
         <TextView
-            android:id="@+id/group_description"
-            android:layout_width="match_parent"
+            android:id="@+id/group_name"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="Short Description"
-            android:textColor="#4F4B48"
-            android:textStyle="italic" />
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="8dp"
+            android:layout_marginBottom="8dp"
+            android:textAppearance="?attr/textAppearanceHeadline6"
+            android.textColor="@android:color/white"
+            app:layout_constraintBottom_toTopOf="@+id/group_leader"
+            app:layout_constraintEnd_toStartOf="@+id/group_overflow_menu"
+            app:layout_constraintStart_toStartOf="parent"
+            tools:text="Mobile App Development" />
 
-        <!-- Details -->
         <TextView
             android:id="@+id/group_leader"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="Group Leader: [Leader]"
-            android:textColor="#4F4B48" />
+            android:layout_marginBottom="16dp"
+            android:textAppearance="?attr/textAppearanceBody2"
+            android.textColor="@android:color/white"
+            app:layout_constraintBottom_toBottomOf="@+id/group_image"
+            app:layout_constraintStart_toStartOf="@+id/group_name"
+            tools:text="Group Leader: John Doe" />
 
-        <TextView
-            android:id="@+id/group_members"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="Members: 0"
-            android:textColor="#4F4B48" />
+        <ImageView
+            android:id="@+id/group_overflow_menu"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:contentDescription="Group options"
+            android:focusable="true"
+            android:padding="12dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:srcCompat="@drawable/ic_overflow"
+            app:tint="@android:color/white" />
 
-        <TextView
-            android:id="@+id/assigned_tasks"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="Assigned Tasks: 0"
-            android:textColor="#4F4B48" />
-
-        <!-- Progress -->
-        <ProgressBar
-            android:id="@+id/group_progress"
-            style="?android:attr/progressBarStyleHorizontal"
+        <LinearLayout
+            android:id="@+id/group_details"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:max="100"
-            android:progress="50"
-            android:progressTint="#6DBE45" />
+            android:orientation="vertical"
+            android:padding="16dp"
+            app:layout_constraintTop_toBottomOf="@+id/group_image">
 
-        <!-- Last Updated -->
-        <TextView
-            android:id="@+id/last_updated"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="Last updated: "
-            android:textColor="#4F4B48"
-            android:textSize="12sp" />
+            <TextView
+                android:id="@+id/group_description"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="2"
+                android:textAppearance="?attr/textAppearanceBody2"
+                android:textColor="?android:attr/textColorSecondary"
+                tools:text="This is a group for the mobile app development project. We will be using this group to collaborate on the project." />
 
-    </LinearLayout>
+            <ProgressBar
+                android:id="@+id/group_progress"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="8dp"
+                android:layout_marginTop="16dp"
+                android:progress="50"
+                android:progressTint="#6DBE45"
+                android:scaleY="1.5" />
 
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/group_members"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:drawablePadding="8dp"
+                    android:gravity="center_vertical"
+                    android:textAppearance="?attr/textAppearanceBody2"
+                    app:drawableStartCompat="@drawable/ic_group"
+                    tools:text="5 Members" />
+
+                <TextView
+                    android:id="@+id/assigned_tasks"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:drawablePadding="8dp"
+                    android:gravity="center_vertical"
+                    android:textAppearance="?attr/textAppearanceBody2"
+                    app:drawableStartCompat="@drawable/ic_task"
+                    tools:text="3 Assigned Tasks" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/last_updated"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textAppearance="?attr/textAppearanceCaption"
+                android:textColor="?android:attr/textColorSecondary"
+                tools:text="Last updated: 2 hours ago" />
+
+        </LinearLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
 </com.google.android.material.card.MaterialCardView>

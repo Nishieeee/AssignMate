@@ -7,14 +7,6 @@
     android:orientation="vertical"
     android:padding="24dp">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Create a New Group"
-        android:textColor="#2C2A28"
-        android:textSize="20sp"
-        android:textStyle="bold" />
-
     <com.google.android.material.textfield.TextInputLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -57,7 +49,6 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Group Code will appear here"
             android:textColor="#4F4B48"
             android:textSize="16sp" />
 

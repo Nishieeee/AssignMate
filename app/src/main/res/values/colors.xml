@@ -8,7 +8,7 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     <color name="off_white">#FFF8F0</color>
-    <color name="status_not_started">#FF0000</color>
+    <color name="status_not_started">#808080</color>
     <color name="status_in_progress">#FFA500</color>
     <color name="status_complete">#008000</color>
     <color name="progress_low">#FF0000</color>

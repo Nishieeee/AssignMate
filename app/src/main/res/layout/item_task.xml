@@ -4,69 +4,70 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginHorizontal="8dp"
-    android:layout_marginVertical="4dp"
-    app:cardBackgroundColor="#FFFFFFFF"
-    app:cardCornerRadius="8dp"
-    app:cardElevation="2dp">
+    android:layout_marginHorizontal="16dp"
+    android:layout_marginVertical="8dp"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="4dp">
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingBottom="12dp">
-
-        <View
-            android:id="@+id/overdue_indicator"
-            android:layout_width="5dp"
-            android:layout_height="0dp"
-            android:background="#E6544F"
-            android:visibility="gone"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            tools:visibility="visible" />
+        android:padding="16dp">
 
         <TextView
             android:id="@+id/task_name"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:layout_marginTop="12dp"
             android:layout_marginEnd="8dp"
-            android:textAppearance="?attr/textAppearanceSubtitle1"
-            android:textStyle="bold"
+            android:textAppearance="?attr/textAppearanceHeadline6"
             app:layout_constraintEnd_toStartOf="@+id/task_overflow_menu"
-            app:layout_constraintStart_toEndOf="@+id/overdue_indicator"
+            app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
-            tools:text="Design new onboarding flow" />
+            tools:text="Task Name" />
 
         <TextView
             android:id="@+id/task_description"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
+            android:layout_marginEnd="8dp"
             android:ellipsize="end"
             android:maxLines="2"
             android:textAppearance="?attr/textAppearanceBody2"
             android:textColor="?android:attr/textColorSecondary"
-            app:layout_constraintEnd_toEndOf="@id/task_name"
-            app:layout_constraintStart_toStartOf="@id/task_name"
-            app:layout_constraintTop_toBottomOf="@id/task_name"
-            tools:text="Create wireframes and mockups for the new user onboarding experience." />
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/task_name"
+            tools:text="Task description that can be quite long and should wrap to the next line." />
 
         <TextView
             android:id="@+id/due_date"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:drawablePadding="4dp"
-            android:gravity="center_vertical"
-            android:textAppearance="?attr/textAppearanceCaption"
+            android:textAppearance="?attr/textAppearanceBody2"
             android:textColor="?android:attr/textColorSecondary"
-            app:drawableStartCompat="@drawable/ic_calendar"
-            app:layout_constraintStart_toStartOf="@id/task_name"
-            app:layout_constraintTop_toBottomOf="@id/task_description"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/task_description"
             tools:text="Due: 25/12/2024" />
+
+        <TextView
+            android:id="@+id/overdue_indicator"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/overdue_background"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="2dp"
+            android:text="Overdue"
+            android:textColor="@android:color/white"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="@+id/due_date"
+            app:layout_constraintStart_toEndOf="@+id/due_date"
+            app:layout_constraintTop_toTopOf="@+id/due_date"
+            tools:visibility="visible" />
 
         <TextView
             android:id="@+id/status"
@@ -75,79 +76,13 @@
             android:layout_marginTop="8dp"
             android:paddingHorizontal="8dp"
             android:paddingVertical="4dp"
-            android:textAppearance="?attr/textAppearanceCaption"
+            android:textAppearance="?attr/textAppearanceBody2"
             android:textStyle="bold"
-            app:layout_constraintStart_toStartOf="@id/due_date"
-            app:layout_constraintTop_toBottomOf="@id/due_date"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/due_date"
             tools:background="@drawable/status_background_in_progress"
-            tools:text="In Progress"
-            tools:textColor="#FFA000" />
-
-        <HorizontalScrollView
-            android:id="@+id/info_scroll_view"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:scrollbars="none"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="@id/status"
-            app:layout_constraintTop_toBottomOf="@id/status">
-
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
-
-                <LinearLayout
-                    android:id="@+id/assignees_section"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:visibility="gone"
-                    tools:visibility="visible">
-
-                    <ImageView
-                        android:layout_width="16dp"
-                        android:layout_height="16dp"
-                        android:src="@drawable/ic_person"
-                        app:tint="?attr/colorControlNormal" />
-
-                    <com.google.android.material.chip.ChipGroup
-                        android:id="@+id/assigned_members_chip_group"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="4dp"
-                        app:chipSpacingHorizontal="4dp" />
-
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/labels_section"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="16dp"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:visibility="gone"
-                    tools:visibility="visible">
-
-                    <ImageView
-                        android:layout_width="16dp"
-                        android:layout_height="16dp"
-                        android:src="@drawable/ic_label"
-                        app:tint="?attr/colorControlNormal" />
-
-                    <com.google.android.material.chip.ChipGroup
-                        android:id="@+id/labels_chip_group"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="4dp"
-                        app:chipSpacingHorizontal="4dp" />
-                </LinearLayout>
-            </LinearLayout>
-        </HorizontalScrollView>
+            tools:text="In progress"
+            tools:textColor="@color/status_in_progress" />
 
         <ImageView
             android:id="@+id/task_overflow_menu"
@@ -161,7 +96,52 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent"
             app:srcCompat="@drawable/ic_overflow"
-            app:tint="?attr/colorControlNormal" />
+            app:tint="?android:attr/textColorSecondary" />
+
+        <LinearLayout
+            android:id="@+id/assignees_section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            app:layout_constraintTop_toBottomOf="@+id/status">
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:src="@drawable/ic_group"
+                app:tint="?attr/colorControlNormal" />
+
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/assigned_members_chip_group"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/labels_section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            app:layout_constraintTop_toBottomOf="@+id/assignees_section">
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:src="@drawable/ic_label"
+                app:tint="?attr/colorControlNormal" />
+
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/labels_chip_group"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp" />
+        </LinearLayout>
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 

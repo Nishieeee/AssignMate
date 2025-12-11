@@ -2,16 +2,12 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="@android:color/white"
     android:orientation="vertical"
-    android:paddingTop="24dp"
-    android:paddingHorizontal="24dp"
-    android:paddingBottom="8dp">
+    android:padding="16dp">
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="16dp"
         android:text="Manage Labels"
         android:textAppearance="?attr/textAppearanceHeadline6" />
 
@@ -19,16 +15,14 @@
         android:id="@+id/labels_recycler_view"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:maxHeight="300dp" />
+        android:layout_marginTop="16dp" />
 
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/create_new_label_button"
-        style="@style/Widget.MaterialComponents.Button.TextButton"
+    <Button
+        android:id="@+id/add_label_button"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="end"
-        android:layout_marginTop="8dp"
-        android:text="Create New Label"
-        android:textColor="#F28A30" />
+        android:layout_marginTop="16dp"
+        android:text="Add Label" />
 
 </LinearLayout>

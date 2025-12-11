@@ -20,6 +20,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.assignmate.adapter.GroupAdapter
 import com.example.assignmate.databinding.ActivityGroupBinding
+import com.example.assignmate.model.Group
+import com.example.assignmate.model.Task
 import com.google.android.material.bottomnavigation.BottomNavigationView
 
 class GroupActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItemSelectedListener {
@@ -27,7 +29,7 @@ class GroupActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItem
     private lateinit var binding: ActivityGroupBinding
     private lateinit var firebaseHelper: FirebaseHelper
     private lateinit var groupAdapter: GroupAdapter
-    private val groups = mutableListOf<com.example.assignmate.model.Group>()
+    private val groups = mutableListOf<Group>()
     private var currentUserId: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -60,7 +62,6 @@ class GroupActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItem
     override fun onResume() {
         super.onResume()
         loadGroups()
-        // updateNotificationBadge()
     }
 
     private fun setupFilterAndSort(){
@@ -83,17 +84,6 @@ class GroupActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItem
         }
     }
 
-//    private fun updateNotificationBadge() {
-//        val notificationBadge = findViewById<TextView>(R.id.notification_badge)
-//        val unreadCount = databaseHelper.getUnreadNotificationCount(currentUserId)
-//        if (unreadCount > 0) {
-//            notificationBadge.visibility = View.VISIBLE
-//            notificationBadge.text = unreadCount.toString()
-//        } else {
-//            notificationBadge.visibility = View.GONE
-//        }
-//    }
-
     private fun setupRecyclerView() {
         groupAdapter = GroupAdapter(groups, currentUserId,
             onGroupClicked = { group ->
@@ -110,14 +100,17 @@ class GroupActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItem
                 showDeleteGroupConfirmationDialog(group)
             },
             onFavouriteClicked = { group ->
-//                if (group.isFavourite) {
-//                    databaseHelper.removeFavouriteGroup(currentUserId, group.id)
-//                    Toast.makeText(this, "\"${group.name}\" removed from favourites", Toast.LENGTH_SHORT).show()
-//                } else {
-//                    databaseHelper.addFavouriteGroup(currentUserId, group.id)
-//                    Toast.makeText(this, "\"${group.name}\" added to favourites", Toast.LENGTH_SHORT).show()
-//                }
-                loadGroups()
+                val isFavourite = group.favouriteBy.contains(currentUserId)
+                firebaseHelper.setFavourite(group.uid, currentUserId, !isFavourite, {
+                    loadGroups()
+                    val message = if (!isFavourite) "Group added to favourites" else "Group removed from favourites"
+                    Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+                }, {})
+            },
+            getUsername = { userId, callback ->
+                firebaseHelper.getUserDetails(userId, {
+                    it?.let { callback(it.username) }
+                }, {})
             }
         )
         binding.groupsRecyclerView.apply {
@@ -128,14 +121,43 @@ class GroupActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItem
 
     private fun loadGroups() {
         firebaseHelper.getGroupsForUser(currentUserId,
-            onSuccess = {
-                groupAdapter.setGroups(it)
-                updateUI()
+            onSuccess = { groups ->
+                val updatedGroups = mutableListOf<Group>()
+                var groupsProcessed = 0
+                for (group in groups) {
+                    firebaseHelper.getTasksForGroup(group.uid, {
+                        val progress = calculateProgress(it)
+                        val assignedTasksCount = it.count { task -> task.assignedTo.contains(currentUserId) }
+                        updatedGroups.add(group.copy(progress = progress, assignedTasksCount = assignedTasksCount))
+                        groupsProcessed++
+                        if(groupsProcessed == groups.size) {
+                            groupAdapter.setGroups(updatedGroups)
+                            updateUI()
+                        }
+                    }, {})
+                }
+                if (groups.isEmpty()){
+                    groupAdapter.setGroups(emptyList())
+                    updateUI()
+                }
             },
             onFailure = {
                 Toast.makeText(this, "Failed to load groups", Toast.LENGTH_SHORT).show()
             }
         )
+    }
+
+    private fun calculateProgress(tasks: List<Task>): Int {
+        if (tasks.isEmpty()) return 0
+        var totalProgress = 0.0
+        for (task in tasks) {
+            totalProgress += when (task.status) {
+                "Complete" -> 100
+                "In progress" -> 50
+                else -> 0
+            }
+        }
+        return (totalProgress / tasks.size).toInt()
     }
 
     private fun updateUI() {

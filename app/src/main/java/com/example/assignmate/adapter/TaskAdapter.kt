@@ -10,7 +10,9 @@ import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.example.assignmate.R
 import com.example.assignmate.databinding.ItemTaskBinding
+import com.example.assignmate.model.Label
 import com.example.assignmate.model.Task
+import com.example.assignmate.model.User
 import com.google.android.material.chip.Chip
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -20,7 +22,9 @@ class TaskAdapter(
     private var tasks: List<Task>,
     private val currentUserId: String,
     private val onItemClicked: (Task) -> Unit, // Changed to a lambda
-    private val onDeleteClicked: (Task) -> Unit
+    private val onDeleteClicked: (Task) -> Unit,
+    private val getUsers: (List<String>, (List<User>) -> Unit) -> Unit,
+    private val getLabels: (String, (List<Label>) -> Unit) -> Unit
 ) : RecyclerView.Adapter<TaskAdapter.TaskViewHolder>() {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): TaskViewHolder {
@@ -69,8 +73,35 @@ class TaskAdapter(
                 binding.overdueIndicator.visibility = View.GONE
             }
 
-            binding.assigneesSection.visibility = View.GONE
-            binding.labelsSection.visibility = View.GONE
+            if (task.assignedTo.isNotEmpty()) {
+                binding.assigneesSection.visibility = View.VISIBLE
+                getUsers(task.assignedTo) { users ->
+                    binding.assignedMembersChipGroup.removeAllViews()
+                    for (user in users) {
+                        val chip = Chip(itemView.context)
+                        chip.text = user.username
+                        binding.assignedMembersChipGroup.addView(chip)
+                    }
+                }
+            } else {
+                binding.assigneesSection.visibility = View.GONE
+            }
+
+            if (task.labels.isNotEmpty()) {
+                binding.labelsSection.visibility = View.VISIBLE
+                getLabels(task.groupId) { labels ->
+                    binding.labelsChipGroup.removeAllViews()
+                    val selectedLabels = labels.filter { task.labels.contains(it.id) }
+                    for (label in selectedLabels) {
+                        val chip = Chip(itemView.context)
+                        chip.text = label.name
+                        chip.chipBackgroundColor = ColorStateList.valueOf(Color.parseColor(label.color))
+                        binding.labelsChipGroup.addView(chip)
+                    }
+                }
+            } else {
+                binding.labelsSection.visibility = View.GONE
+            }
 
             binding.root.setOnClickListener {
                 onItemClicked(task)

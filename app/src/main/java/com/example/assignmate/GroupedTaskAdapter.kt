@@ -1,17 +1,28 @@
 package com.example.assignmate
 
 import android.content.Intent
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
+import com.example.assignmate.model.Label
 import com.example.assignmate.model.Task
+import com.example.assignmate.model.User
+import com.google.android.material.chip.Chip
+import com.google.android.material.chip.ChipGroup
 
 private const val VIEW_TYPE_GROUP = 0
 private const val VIEW_TYPE_TASK = 1
 
-class GroupedTaskAdapter(private val tasksByGroup: Map<String, List<Task>>, private val currentUserId: String) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+class GroupedTaskAdapter(
+    private val tasksByGroup: Map<String, List<Task>>,
+    private val currentUserId: String,
+    private val getUsers: (List<String>, (List<User>) -> Unit) -> Unit,
+    private val getLabels: (String, (List<Label>) -> Unit) -> Unit
+) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     private val items = mutableListOf<Any>()
 
@@ -60,10 +71,44 @@ class GroupedTaskAdapter(private val tasksByGroup: Map<String, List<Task>>, priv
     inner class TaskViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val taskNameTextView: TextView = itemView.findViewById(R.id.task_name)
         private val taskStatusTextView: TextView = itemView.findViewById(R.id.status)
+        private val assignedMembersChipGroup: ChipGroup = itemView.findViewById(R.id.assigned_members_chip_group)
+        private val labelsChipGroup: ChipGroup = itemView.findViewById(R.id.labels_chip_group)
+        private val assigneesSection: View = itemView.findViewById(R.id.assignees_section)
+        private val labelsSection: View = itemView.findViewById(R.id.labels_section)
 
         fun bind(task: Task) {
             taskNameTextView.text = task.name
             taskStatusTextView.text = "Status: ${task.status}"
+
+            if (task.assignedTo.isNotEmpty()) {
+                assigneesSection.visibility = View.VISIBLE
+                getUsers(task.assignedTo) { users ->
+                    assignedMembersChipGroup.removeAllViews()
+                    for (user in users) {
+                        val chip = Chip(itemView.context)
+                        chip.text = user.username
+                        assignedMembersChipGroup.addView(chip)
+                    }
+                }
+            } else {
+                assigneesSection.visibility = View.GONE
+            }
+
+            if (task.labels.isNotEmpty()) {
+                labelsSection.visibility = View.VISIBLE
+                getLabels(task.groupId) { labels ->
+                    labelsChipGroup.removeAllViews()
+                    val selectedLabels = labels.filter { task.labels.contains(it.id) }
+                    for (label in selectedLabels) {
+                        val chip = Chip(itemView.context)
+                        chip.text = label.name
+                        chip.chipBackgroundColor = ColorStateList.valueOf(Color.parseColor(label.color))
+                        labelsChipGroup.addView(chip)
+                    }
+                }
+            } else {
+                labelsSection.visibility = View.GONE
+            }
 
             itemView.setOnClickListener {
                 val context = itemView.context

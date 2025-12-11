@@ -2,6 +2,7 @@ package com.example.assignmate
 
 import com.example.assignmate.model.Comment
 import com.example.assignmate.model.Group
+import com.example.assignmate.model.Label
 import com.example.assignmate.model.Member
 import com.example.assignmate.model.Notification
 import com.example.assignmate.model.Subtask
@@ -9,7 +10,9 @@ import com.example.assignmate.model.Task
 import com.example.assignmate.model.User
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 
 class FirebaseHelper {
 
@@ -19,8 +22,9 @@ class FirebaseHelper {
     private val usersCollection = db.collection("users")
     private val tasksCollection = db.collection("tasks")
     private val commentsCollection = db.collection("comments")
-    private val subtasksCollection = db.collection("subtasks")
     private val notificationsCollection = db.collection("notifications")
+    private val labelsCollection = db.collection("labels")
+
 
     fun loginUser(email: String, password: String, onSuccess: (String) -> Unit, onFailure: (Exception) -> Unit) {
         auth.signInWithEmailAndPassword(email, password)
@@ -151,11 +155,37 @@ class FirebaseHelper {
             }
     }
 
+    fun setFavourite(groupId: String, userId: String, isFavourite: Boolean, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
+        val update = if (isFavourite) {
+            FieldValue.arrayUnion(userId)
+        } else {
+            FieldValue.arrayRemove(userId)
+        }
+        groupsCollection.document(groupId).update("favouriteBy", update)
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { e -> onFailure(e) }
+    }
+
     fun getUserDetails(userId: String, onSuccess: (User?) -> Unit, onFailure: (Exception) -> Unit) {
         usersCollection.document(userId).get()
             .addOnSuccessListener { documentSnapshot ->
                 val user = documentSnapshot.toObject(User::class.java)
                 onSuccess(user)
+            }
+            .addOnFailureListener { e ->
+                onFailure(e)
+            }
+    }
+
+    fun getUsers(userIds: List<String>, onSuccess: (List<User>) -> Unit, onFailure: (Exception) -> Unit) {
+        if (userIds.isEmpty()) {
+            onSuccess(emptyList())
+            return
+        }
+        usersCollection.whereIn(FieldPath.documentId(), userIds).get()
+            .addOnSuccessListener { querySnapshot ->
+                val users = querySnapshot.toObjects(User::class.java)
+                onSuccess(users)
             }
             .addOnFailureListener { e ->
                 onFailure(e)
@@ -175,10 +205,25 @@ class FirebaseHelper {
 
     fun getPendingTasksForUser(userId: String, onSuccess: (Int) -> Unit, onFailure: (Exception) -> Unit) {
         tasksCollection.whereArrayContains("assignedTo", userId)
-            .whereNotEqualTo("status", "Complete")
             .get()
             .addOnSuccessListener { querySnapshot ->
-                onSuccess(querySnapshot.size())
+                val pendingTasks = querySnapshot.toObjects(Task::class.java).count { it.status != "Complete" }
+                onSuccess(pendingTasks)
+            }
+            .addOnFailureListener { e ->
+                onFailure(e)
+            }
+    }
+
+    fun getDueTasksForUser(userId: String, onSuccess: (Int) -> Unit, onFailure: (Exception) -> Unit) {
+        tasksCollection.whereArrayContains("assignedTo", userId)
+            .get()
+            .addOnSuccessListener { querySnapshot ->
+                val currentTime = System.currentTimeMillis()
+                val dueTasks = querySnapshot.toObjects(Task::class.java).count {
+                    it.dueDate < currentTime && it.dueDate != 0L && !it.status.equals("Complete", ignoreCase = true)
+                }
+                onSuccess(dueTasks)
             }
             .addOnFailureListener { e ->
                 onFailure(e)
@@ -187,10 +232,13 @@ class FirebaseHelper {
 
     fun getUpcomingTasksForUser(userId: String, onSuccess: (List<Task>) -> Unit, onFailure: (Exception) -> Unit) {
         val currentTime = System.currentTimeMillis()
+        val sevenDaysInMillis = 7 * 24 * 60 * 60 * 1000
+        val sevenDaysFromNow = currentTime + sevenDaysInMillis
+
         tasksCollection.whereArrayContains("assignedTo", userId)
             .whereGreaterThan("dueDate", currentTime)
+            .whereLessThanOrEqualTo("dueDate", sevenDaysFromNow)
             .orderBy("dueDate")
-            .limit(5)
             .get()
             .addOnSuccessListener { querySnapshot ->
                 val tasks = querySnapshot.toObjects(Task::class.java)
@@ -235,10 +283,20 @@ class FirebaseHelper {
             .addOnSuccessListener { documentSnapshot ->
                 val group = documentSnapshot.toObject(Group::class.java)
                 if (group != null) {
-                    val members = group.members.map { (userId, role) ->
-                        Member(id = userId, role = role)
+                    val memberIds = group.members.keys.toList()
+                    if (memberIds.isEmpty()) {
+                        onSuccess(emptyList())
+                        return@addOnSuccessListener
                     }
-                    onSuccess(members)
+                    usersCollection.whereIn(FieldPath.documentId(), memberIds).get()
+                        .addOnSuccessListener { usersSnapshot ->
+                            val users = usersSnapshot.toObjects(User::class.java)
+                            val members = users.map { user ->
+                                Member(id = user.id, name = user.username, role = group.members[user.id] ?: "")
+                            }
+                            onSuccess(members)
+                        }
+                        .addOnFailureListener { e -> onFailure(e) }
                 } else {
                     onFailure(Exception("Group not found"))
                 }
@@ -268,7 +326,9 @@ class FirebaseHelper {
                 val task = documentSnapshot.toObject(Task::class.java)
                 onSuccess(task)
             }
-            .addOnFailureListener { e -> onFailure(e) }
+            .addOnFailureListener { e ->
+                onFailure(e)
+            }
     }
 
     fun updateTask(
@@ -278,6 +338,8 @@ class FirebaseHelper {
         dueDate: Long?,
         status: String,
         assignedTo: List<String>?,
+        subtasks: List<Subtask>,
+        labels: List<String>,
         onSuccess: () -> Unit,
         onFailure: (Exception) -> Unit
     ) {
@@ -286,7 +348,9 @@ class FirebaseHelper {
             "description" to description,
             "dueDate" to dueDate,
             "status" to status,
-            "assignedTo" to assignedTo
+            "assignedTo" to assignedTo,
+            "subtasks" to subtasks,
+            "labels" to labels
         )
         tasksCollection.document(taskId).update(updates)
             .addOnSuccessListener { onSuccess() }
@@ -304,27 +368,6 @@ class FirebaseHelper {
 
     fun addComment(comment: Comment, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
         commentsCollection.add(comment)
-            .addOnSuccessListener { onSuccess() }
-            .addOnFailureListener { e -> onFailure(e) }
-    }
-
-    fun getSubtasksForTask(taskId: String, onSuccess: (List<Subtask>) -> Unit, onFailure: (Exception) -> Unit) {
-        subtasksCollection.whereEqualTo("taskId", taskId).get()
-            .addOnSuccessListener { querySnapshot ->
-                val subtasks = querySnapshot.toObjects(Subtask::class.java)
-                onSuccess(subtasks)
-            }
-            .addOnFailureListener { e -> onFailure(e) }
-    }
-
-    fun createSubtask(subtask: Subtask, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
-        subtasksCollection.add(subtask)
-            .addOnSuccessListener { onSuccess() }
-            .addOnFailureListener { e -> onFailure(e) }
-    }
-
-    fun updateSubtaskStatus(subtaskId: String, isCompleted: Boolean, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
-        subtasksCollection.document(subtaskId).update("completed", isCompleted)
             .addOnSuccessListener { onSuccess() }
             .addOnFailureListener { e -> onFailure(e) }
     }
@@ -389,6 +432,58 @@ class FirebaseHelper {
             .addOnSuccessListener { querySnapshot ->
                 onSuccess(querySnapshot.size())
             }
+            .addOnFailureListener { e -> onFailure(e) }
+    }
+
+    fun createTask(task: Task, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
+        tasksCollection.add(task)
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { e -> onFailure(e) }
+    }
+
+    fun getUserByEmail(email: String, onSuccess: (User?) -> Unit, onFailure: (Exception) -> Unit) {
+        usersCollection.whereEqualTo("email", email).get()
+            .addOnSuccessListener { querySnapshot ->
+                if (querySnapshot.isEmpty) {
+                    onSuccess(null)
+                } else {
+                    val user = querySnapshot.documents.first().toObject(User::class.java)
+                    onSuccess(user)
+                }
+            }
+            .addOnFailureListener { e ->
+                onFailure(e)
+            }
+    }
+
+    fun getLabelsForGroup(groupId: String, onSuccess: (List<Label>) -> Unit, onFailure: (Exception) -> Unit) {
+        labelsCollection.whereEqualTo("groupId", groupId).get()
+            .addOnSuccessListener { querySnapshot ->
+                val labels = querySnapshot.toObjects(Label::class.java)
+                onSuccess(labels)
+            }
+            .addOnFailureListener { e -> onFailure(e) }
+    }
+
+    fun addLabel(label: Label, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
+        labelsCollection.add(label)
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { e -> onFailure(e) }
+    }
+
+    fun updateLabel(labelId: String, name: String, color: String, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
+        val updates = mapOf(
+            "name" to name,
+            "color" to color
+        )
+        labelsCollection.document(labelId).update(updates)
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { e -> onFailure(e) }
+    }
+
+    fun deleteLabel(labelId: String, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
+        labelsCollection.document(labelId).delete()
+            .addOnSuccessListener { onSuccess() }
             .addOnFailureListener { e -> onFailure(e) }
     }
 }

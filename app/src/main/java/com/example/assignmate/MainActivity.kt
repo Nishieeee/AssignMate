@@ -15,6 +15,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.example.assignmate.adapter.FavouriteGroupAdapter
 import com.example.assignmate.adapter.UpcomingTasksAdapter
 import com.example.assignmate.databinding.ActivityMainBinding
 
@@ -86,8 +87,39 @@ class MainActivity : AppCompatActivity() {
             }
         )
 
+        firebaseHelper.getUnreadNotificationCount(currentUserId,
+            onSuccess = { count ->
+                if (count > 0) {
+                    binding.notificationBadge.visibility = View.VISIBLE
+                    binding.notificationBadge.text = count.toString()
+                } else {
+                    binding.notificationBadge.visibility = View.GONE
+                }
+            },
+            onFailure = {
+                binding.notificationBadge.visibility = View.GONE
+            }
+        )
+
         firebaseHelper.getGroupsForUser(currentUserId,
-            onSuccess = { binding.totalGroups.text = it.size.toString() },
+            onSuccess = { 
+                binding.totalGroups.text = it.size.toString()
+                val favouriteGroups = it.filter { group -> group.favouriteBy.contains(currentUserId) }
+                if (favouriteGroups.isEmpty()) {
+                    binding.favouriteGroupsRecyclerView.visibility = View.GONE
+                    binding.noFavouriteGroupText.visibility = View.VISIBLE
+                } else {
+                    binding.favouriteGroupsRecyclerView.visibility = View.VISIBLE
+                    binding.noFavouriteGroupText.visibility = View.GONE
+                    binding.favouriteGroupsRecyclerView.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+                    binding.favouriteGroupsRecyclerView.adapter = FavouriteGroupAdapter(favouriteGroups) { group ->
+                        val intent = Intent(this, SingleGroupActivity::class.java)
+                        intent.putExtra("GROUP_ID", group.uid)
+                        intent.putExtra("USER_ID", currentUserId)
+                        startActivity(intent)
+                    }
+                }
+            },
             onFailure = { binding.totalGroups.text = "0" }
         )
 
@@ -101,6 +133,11 @@ class MainActivity : AppCompatActivity() {
             onFailure = { binding.pendingTasks.text = "0" }
         )
 
+        firebaseHelper.getDueTasksForUser(currentUserId,
+            onSuccess = { binding.dueTasks.text = it.toString() },
+            onFailure = { binding.dueTasks.text = "0" }
+        )
+
         firebaseHelper.getUpcomingTasksForUser(currentUserId,
             onSuccess = {
                 if (it.isEmpty()) {
@@ -109,12 +146,17 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     binding.upcomingDeadlinesRecyclerView.visibility = View.VISIBLE
                     binding.noUpcomingDeadlinesText.visibility = View.GONE
-                    binding.upcomingDeadlinesRecyclerView.adapter = UpcomingTasksAdapter(it) { task ->
+                    binding.upcomingDeadlinesRecyclerView.layoutManager = LinearLayoutManager(this)
+                    val adapter = UpcomingTasksAdapter(it, {
+                        task ->
                         val intent = Intent(this, TaskDetailActivity::class.java)
                         intent.putExtra("TASK_ID", task.uid)
                         intent.putExtra("USER_ID", currentUserId)
                         startActivity(intent)
-                    }
+                    }, { groupId, callback ->
+                        firebaseHelper.getGroup(groupId, callback, {})
+                    })
+                    binding.upcomingDeadlinesRecyclerView.adapter = adapter
                 }
             },
             onFailure = {

@@ -17,7 +17,8 @@ class GroupAdapter(
     private val onGroupClicked: (Group) -> Unit,
     private val onEditClicked: (Group) -> Unit,
     private val onDeleteClicked: (Group) -> Unit,
-    private val onFavouriteClicked: (Group) -> Unit
+    private val onFavouriteClicked: (Group) -> Unit,
+    private val getUsername: (String, (String) -> Unit) -> Unit
 ) : RecyclerView.Adapter<GroupAdapter.GroupViewHolder>() {
 
     private var allGroups: List<Group> = ArrayList(groups)
@@ -52,7 +53,9 @@ class GroupAdapter(
     inner class GroupViewHolder(private val binding: ItemGroupCardBinding) : RecyclerView.ViewHolder(binding.root) {
         fun bind(group: Group) {
             binding.groupName.text = group.name
-            binding.groupLeader.text = "Group Leader: ${group.leaderId}" // This will be updated later
+            getUsername(group.leaderId) { username ->
+                binding.groupLeader.text = "Group Leader: $username"
+            }
             binding.groupMembers.text = "Members: ${group.members.size}"
             binding.assignedTasks.text = "Assigned Tasks: ${group.assignedTasksCount}"
             binding.groupDescription.text = group.description
@@ -67,7 +70,8 @@ class GroupAdapter(
                 val popup = PopupMenu(view.context, view)
                 popup.menuInflater.inflate(R.menu.group_card_menu, popup.menu)
 
-                popup.menu.findItem(R.id.action_add_to_favourite).isVisible = false // Hide favourite button for now
+                val isFavourite = group.favouriteBy.contains(currentUserId)
+                popup.menu.findItem(R.id.action_add_to_favourite).title = if (isFavourite) "Remove from Favourites" else "Add to Favourites"
 
                 popup.setOnMenuItemClickListener { menuItem ->
                     when (menuItem.itemId) {
@@ -77,6 +81,10 @@ class GroupAdapter(
                         }
                         R.id.action_delete_group -> {
                             onDeleteClicked(group)
+                            true
+                        }
+                        R.id.action_add_to_favourite -> {
+                            onFavouriteClicked(group)
                             true
                         }
                         else -> false

@@ -22,10 +22,11 @@ class GroupTasksFragment : Fragment() {
 
     private lateinit var tasksRecyclerView: RecyclerView
     private lateinit var taskAdapter: TaskAdapter
+    private var allTasks = listOf<Task>()
 
     private val taskDetailLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
-            loadTasks()
+            (activity as? SingleGroupActivity)?.loadTasks()
         }
     }
 
@@ -44,33 +45,33 @@ class GroupTasksFragment : Fragment() {
         val view = inflater.inflate(R.layout.fragment_group_tasks, container, false)
         tasksRecyclerView = view.findViewById(R.id.tasks_recycler_view)
         tasksRecyclerView.layoutManager = LinearLayoutManager(context)
-
-        loadTasks()
-
+        // The activity will now provide the initial list of tasks
         return view
     }
 
-    private fun loadTasks() {
+    fun displayTasks(tasks: List<Task>) {
         val currentUserId = (activity as? SingleGroupActivity)?.intent?.getStringExtra("USER_ID") ?: ""
-        firebaseHelper.getTasksForGroup(groupId,
-            onSuccess = {
-                taskAdapter = TaskAdapter(it, currentUserId,
-                    onItemClicked = { task ->
-                        val intent = Intent(requireContext(), TaskDetailActivity::class.java).apply {
-                            putExtra("TASK_ID", task.uid)
-                            putExtra("USER_ID", currentUserId)
-                        }
-                        taskDetailLauncher.launch(intent)
-                    },
-                    onDeleteClicked = { task ->
-                        showDeleteConfirmationDialog(task)
-                    })
-                tasksRecyclerView.adapter = taskAdapter
-            },
-            onFailure = {
-                Toast.makeText(requireContext(), "Failed to load tasks", Toast.LENGTH_SHORT).show()
-            }
-        )
+        if (isAdded) {
+            taskAdapter = TaskAdapter(tasks, currentUserId,
+                onItemClicked = { task ->
+                    val intent = Intent(requireContext(), TaskDetailActivity::class.java).apply {
+                        putExtra("TASK_ID", task.uid)
+                        putExtra("USER_ID", currentUserId)
+                    }
+                    taskDetailLauncher.launch(intent)
+                },
+                onDeleteClicked = { task ->
+                    showDeleteConfirmationDialog(task)
+                },
+                getUsers = { userIds, callback ->
+                    firebaseHelper.getUsers(userIds, callback, {})
+                },
+                getLabels = { groupId, callback ->
+                    firebaseHelper.getLabelsForGroup(groupId, callback, {})
+                }
+            )
+            tasksRecyclerView.adapter = taskAdapter
+        }
     }
 
     private fun showDeleteConfirmationDialog(task: Task) {
@@ -81,7 +82,7 @@ class GroupTasksFragment : Fragment() {
                 firebaseHelper.deleteTask(task.uid,
                     onSuccess = {
                         Toast.makeText(requireContext(), "Task deleted", Toast.LENGTH_SHORT).show()
-                        loadTasks()
+                        (activity as? SingleGroupActivity)?.loadTasks()
                     },
                     onFailure = {
                         Toast.makeText(requireContext(), "Failed to delete task", Toast.LENGTH_SHORT).show()
