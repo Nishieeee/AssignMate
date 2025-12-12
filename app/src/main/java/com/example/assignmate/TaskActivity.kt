@@ -45,8 +45,9 @@ class TaskActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItemS
         setupFilterAndSearch()
         loadTasks()
 
-        binding.bottomNavigation.selectedItemId = R.id.action_tasks
-        binding.bottomNavigation.setOnNavigationItemSelectedListener(this)
+        val bottomNavigation = findViewById<BottomNavigationView>(R.id.bottom_navigation)
+        bottomNavigation.selectedItemId = R.id.action_tasks
+        bottomNavigation.setOnNavigationItemSelectedListener(this)
 
         val notificationBell = findViewById<ImageView>(R.id.notification_bell)
         notificationBell.setOnClickListener {
