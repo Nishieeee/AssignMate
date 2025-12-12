@@ -7,6 +7,7 @@ data class Task(
     val name: String = "",
     val description: String = "",
     val groupId: String = "",
+    val groupName: String = "",
     val dueDate: Long = 0,
     val status: String = "",
     val assignedTo: List<String> = emptyList(),

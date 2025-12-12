@@ -140,18 +140,17 @@
             android:showDividers="middle">
 
             <TextView
-                style="@style/ProfileMenuItem"
-                android:text="View Profile" />
-
-            <TextView
+                android:id="@+id/settings_button"
                 style="@style/ProfileMenuItem"
                 android:text="Settings" />
 
             <TextView
+                android:id="@+id/help_button"
                 style="@style/ProfileMenuItem"
                 android:text="Help" />
 
             <TextView
+                android:id="@+id/about_button"
                 style="@style/ProfileMenuItem"
                 android:text="About AssignMate" />
 
@@ -164,7 +163,7 @@
             android:layout_alignParentBottom="true"
             android:layout_marginStart="24dp"
             android:layout_marginEnd="24dp"
-            android:layout_marginBottom="?attr/actionBarSize"
+            android:layout_marginBottom="91dp"
             android:backgroundTint="#E6544F"
             android:text="Sign Out"
             android:textColor="#FFFFFF" />

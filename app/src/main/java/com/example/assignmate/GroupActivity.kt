@@ -42,6 +42,7 @@ class GroupActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItem
 
         setupRecyclerView()
         setupFilterAndSort()
+        updateNotificationBadge()
 
         binding.addGroupButton.setOnClickListener {
             showJoinGroupDialog()
@@ -62,6 +63,7 @@ class GroupActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItem
     override fun onResume() {
         super.onResume()
         loadGroups()
+        updateNotificationBadge()
     }
 
     private fun setupFilterAndSort(){
@@ -365,7 +367,10 @@ class GroupActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItem
                 return false
             }
             R.id.action_tasks -> {
-                Toast.makeText(this, "Tasks not implemented yet", Toast.LENGTH_SHORT).show()
+                val intent = Intent(this, TaskActivity::class.java)
+                intent.putExtra("USER_ID", currentUserId)
+                startActivity(intent)
+                finish()
                 return true
             }
             R.id.action_profile -> {
@@ -377,5 +382,19 @@ class GroupActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItem
             }
         }
         return false
+    }
+
+    private fun updateNotificationBadge() {
+        val notificationBadge = findViewById<TextView>(R.id.notification_badge)
+        if (currentUserId.isNotEmpty()) {
+            firebaseHelper.getUnreadNotificationCount(currentUserId, {
+                if (it > 0) {
+                    notificationBadge.visibility = View.VISIBLE
+                    notificationBadge.text = it.toString()
+                } else {
+                    notificationBadge.visibility = View.GONE
+                }
+            }, {})
+        }
     }
 }

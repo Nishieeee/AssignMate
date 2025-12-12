@@ -57,6 +57,12 @@ class MainActivity : AppCompatActivity() {
                     showCreateGroupDialog()
                     false
                 }
+                R.id.action_tasks -> {
+                    val intent = Intent(this, TaskActivity::class.java)
+                    intent.putExtra("USER_ID", currentUserId)
+                    startActivity(intent)
+                    true
+                }
                 R.id.action_profile -> {
                     val intent = Intent(this, ProfileActivity::class.java)
                     intent.putExtra("USER_ID", currentUserId)

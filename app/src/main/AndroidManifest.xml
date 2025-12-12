@@ -29,6 +29,10 @@
         <activity android:name=".ProfileActivity" />
         <activity android:name=".TaskDetailActivity" />
         <activity android:name=".NotificationsActivity" />
+        <activity android:name=".AboutActivity" />
+        <activity android:name=".HelpActivity" />
+        <activity android:name=".SettingsActivity" />
+        <activity android:name=".TaskActivity" />
 
         <meta-data
             android:name="preloaded_fonts"

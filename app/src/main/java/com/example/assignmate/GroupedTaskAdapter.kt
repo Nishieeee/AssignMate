@@ -79,6 +79,7 @@ class GroupedTaskAdapter(
         fun bind(task: Task) {
             taskNameTextView.text = task.name
             taskStatusTextView.text = "Status: ${task.status}"
+            taskStatusTextView.visibility = View.VISIBLE
 
             if (task.assignedTo.isNotEmpty()) {
                 assigneesSection.visibility = View.VISIBLE

@@ -15,6 +15,7 @@ import com.example.assignmate.model.Task
 import com.example.assignmate.model.User
 import com.google.android.material.chip.Chip
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -67,8 +68,26 @@ class TaskAdapter(
             binding.status.setTextColor(ContextCompat.getColor(context, statusColor))
             binding.status.setBackgroundResource(statusBackground)
 
-            if (task.dueDate != 0L && task.dueDate < System.currentTimeMillis() && task.status != "Complete") {
-                binding.overdueIndicator.visibility = View.VISIBLE
+            if (task.dueDate != 0L && task.status != "Complete") {
+                val dueDateCal = Calendar.getInstance().apply { timeInMillis = task.dueDate }
+                val todayCal = Calendar.getInstance()
+
+                // Normalize both to the start of the day
+                dueDateCal.set(Calendar.HOUR_OF_DAY, 0)
+                dueDateCal.set(Calendar.MINUTE, 0)
+                dueDateCal.set(Calendar.SECOND, 0)
+                dueDateCal.set(Calendar.MILLISECOND, 0)
+
+                todayCal.set(Calendar.HOUR_OF_DAY, 0)
+                todayCal.set(Calendar.MINUTE, 0)
+                todayCal.set(Calendar.SECOND, 0)
+                todayCal.set(Calendar.MILLISECOND, 0)
+
+                if (todayCal.timeInMillis > dueDateCal.timeInMillis) {
+                    binding.overdueIndicator.visibility = View.VISIBLE
+                } else {
+                    binding.overdueIndicator.visibility = View.GONE
+                }
             } else {
                 binding.overdueIndicator.visibility = View.GONE
             }

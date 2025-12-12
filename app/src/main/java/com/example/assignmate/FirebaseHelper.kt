@@ -58,6 +58,18 @@ class FirebaseHelper {
             }
     }
 
+    fun sendPasswordResetEmail(email: String, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
+        auth.sendPasswordResetEmail(email)
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { e -> onFailure(e) }
+    }
+
+    fun updateUsername(userId: String, username: String, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
+        usersCollection.document(userId).update("username", username)
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { e -> onFailure(e) }
+    }
+
     fun createGroup(
         groupName: String,
         groupDescription: String,
@@ -252,6 +264,18 @@ class FirebaseHelper {
 
     fun getTasksForGroup(groupId: String, onSuccess: (List<Task>) -> Unit, onFailure: (Exception) -> Unit) {
         tasksCollection.whereEqualTo("groupId", groupId)
+            .get()
+            .addOnSuccessListener { querySnapshot ->
+                val tasks = querySnapshot.toObjects(Task::class.java)
+                onSuccess(tasks)
+            }
+            .addOnFailureListener { e ->
+                onFailure(e)
+            }
+    }
+
+    fun getAllTasksForUser(userId: String, onSuccess: (List<Task>) -> Unit, onFailure: (Exception) -> Unit) {
+        tasksCollection.whereArrayContains("assignedTo", userId)
             .get()
             .addOnSuccessListener { querySnapshot ->
                 val tasks = querySnapshot.toObjects(Task::class.java)

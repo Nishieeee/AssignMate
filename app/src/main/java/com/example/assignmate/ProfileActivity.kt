@@ -4,52 +4,40 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.MenuItem
 import android.view.View
-import android.widget.Button
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import com.example.assignmate.databinding.ActivityProfileBinding
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.firebase.auth.FirebaseAuth
 
 class ProfileActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItemSelectedListener {
 
-    private var currentUserId: String = ""
+    private lateinit var binding: ActivityProfileBinding
     private lateinit var firebaseHelper: FirebaseHelper
+    private lateinit var auth: FirebaseAuth
+    private var currentUserId: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_profile)
+        binding = ActivityProfileBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
         firebaseHelper = FirebaseHelper()
-        currentUserId = intent.getStringExtra("USER_ID") ?: ""
+        auth = FirebaseAuth.getInstance()
+        currentUserId = auth.currentUser?.uid ?: ""
 
-        firebaseHelper.getUserDetails(currentUserId,
-            onSuccess = {
-                val profileName = findViewById<TextView>(R.id.profile_name)
-                val profileEmail = findViewById<TextView>(R.id.profile_email)
+        setSupportActionBar(binding.toolbar)
+        supportActionBar?.setDisplayHomeAsUpEnabled(false)
+        supportActionBar?.title = "Profile"
 
-                if (it != null) {
-                    profileName.text = it.username
-                    profileEmail.text = it.email
-                } else {
-                    profileName.text = "User Not Found"
-                    profileEmail.text = ""
-                }
-            },
-            onFailure = {}
-        )
-
-        val signOutButton = findViewById<Button>(R.id.sign_out_button)
-        signOutButton.setOnClickListener {
-            FirebaseAuth.getInstance().signOut()
-            val intent = Intent(this, LoginActivity::class.java)
-            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-            startActivity(intent)
-        }
+        loadUserProfile()
+        updateNotificationBadge()
 
         val bottomNavigationView = findViewById<BottomNavigationView>(R.id.bottom_navigation)
-        bottomNavigationView.setOnNavigationItemSelectedListener(this)
         bottomNavigationView.selectedItemId = R.id.action_profile
+        bottomNavigationView.setOnNavigationItemSelectedListener(this)
 
         val notificationBell = findViewById<ImageView>(R.id.notification_bell)
         notificationBell.setOnClickListener {
@@ -57,40 +45,100 @@ class ProfileActivity : AppCompatActivity(), BottomNavigationView.OnNavigationIt
             intent.putExtra("USER_ID", currentUserId)
             startActivity(intent)
         }
+
+        binding.settingsButton.setOnClickListener {
+            startActivity(Intent(this, SettingsActivity::class.java))
+        }
+
+        binding.aboutButton.setOnClickListener {
+            startActivity(Intent(this, AboutActivity::class.java))
+        }
+
+        binding.helpButton.setOnClickListener {
+            startActivity(Intent(this, HelpActivity::class.java))
+        }
+
+        binding.signOutButton.setOnClickListener {
+            auth.signOut()
+            val intent = Intent(this, LoginActivity::class.java)
+            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            startActivity(intent)
+            finish()
+        }
     }
 
-    override fun onResume() {
-        super.onResume()
-        updateNotificationBadge()
+    private fun loadUserProfile() {
+        if (currentUserId.isNotEmpty()) {
+            firebaseHelper.getUserDetails(currentUserId, { user ->
+                if (user != null) {
+                    binding.profileName.text = user.username
+                    binding.profileEmail.text = user.email
+                }
+            }, {
+                Toast.makeText(this, "Failed to load profile", Toast.LENGTH_SHORT).show()
+            })
+        }
     }
 
     private fun updateNotificationBadge() {
         val notificationBadge = findViewById<TextView>(R.id.notification_badge)
-        firebaseHelper.getUnreadNotificationCount(currentUserId,
-            onSuccess = {
+        if (currentUserId.isNotEmpty()) {
+            firebaseHelper.getUnreadNotificationCount(currentUserId, {
                 if (it > 0) {
                     notificationBadge.visibility = View.VISIBLE
                     notificationBadge.text = it.toString()
                 } else {
                     notificationBadge.visibility = View.GONE
                 }
-            },
-            onFailure = {}
-        )
+            }, {})
+        }
+    }
+
+    override fun onSupportNavigateUp(): Boolean {
+        onBackPressed()
+        return true
     }
 
     override fun onNavigationItemSelected(item: MenuItem): Boolean {
-        if (item.itemId == R.id.action_profile) {
-            return true
+        when (item.itemId) {
+            R.id.action_home -> {
+                val intent = Intent(this, MainActivity::class.java)
+                intent.putExtra("USER_ID", currentUserId)
+                startActivity(intent)
+                finish()
+                return true
+            }
+            R.id.action_groups -> {
+                val intent = Intent(this, GroupActivity::class.java)
+                intent.putExtra("USER_ID", currentUserId)
+                startActivity(intent)
+                finish()
+                return true
+            }
+            R.id.action_create -> {
+                val intent = Intent(this, GroupActivity::class.java)
+                intent.putExtra("USER_ID", currentUserId)
+                intent.putExtra("SHOW_CREATE_DIALOG", true) // Inform GroupActivity to show the dialog
+                startActivity(intent)
+                return false // Do not select the item
+            }
+            R.id.action_tasks -> {
+                val intent = Intent(this, TaskActivity::class.java)
+                intent.putExtra("USER_ID", currentUserId)
+                startActivity(intent)
+                finish()
+                return true
+            }
+            R.id.action_profile -> {
+                // Already here
+                return true
+            }
         }
+        return false
+    }
 
-        val intent = when (item.itemId) {
-            R.id.action_home -> Intent(this, MainActivity::class.java)
-            R.id.action_groups -> Intent(this, GroupActivity::class.java)
-            else -> null
-        }
-        intent?.putExtra("USER_ID", currentUserId)
-        startActivity(intent)
-        return true
+    override fun onResume() {
+        super.onResume()
+        updateNotificationBadge()
     }
 }
