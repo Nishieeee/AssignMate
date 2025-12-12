@@ -220,8 +220,10 @@ class FirebaseHelper {
             .get()
             .addOnSuccessListener { querySnapshot ->
                 val currentTime = System.currentTimeMillis()
+                val threeDaysInMillis = 3 * 24 * 60 * 60 * 1000
+                val threeDaysFromNow = currentTime + threeDaysInMillis
                 val dueTasks = querySnapshot.toObjects(Task::class.java).count {
-                    it.dueDate < currentTime && it.dueDate != 0L && !it.status.equals("Complete", ignoreCase = true)
+                    it.dueDate > currentTime && it.dueDate <= threeDaysFromNow && !it.status.equals("Complete", ignoreCase = true)
                 }
                 onSuccess(dueTasks)
             }
@@ -231,18 +233,16 @@ class FirebaseHelper {
     }
 
     fun getUpcomingTasksForUser(userId: String, onSuccess: (List<Task>) -> Unit, onFailure: (Exception) -> Unit) {
-        val currentTime = System.currentTimeMillis()
-        val sevenDaysInMillis = 7 * 24 * 60 * 60 * 1000
-        val sevenDaysFromNow = currentTime + sevenDaysInMillis
-
         tasksCollection.whereArrayContains("assignedTo", userId)
-            .whereGreaterThan("dueDate", currentTime)
-            .whereLessThanOrEqualTo("dueDate", sevenDaysFromNow)
-            .orderBy("dueDate")
             .get()
             .addOnSuccessListener { querySnapshot ->
-                val tasks = querySnapshot.toObjects(Task::class.java)
-                onSuccess(tasks)
+                val currentTime = System.currentTimeMillis()
+                val threeDaysInMillis = 3 * 24 * 60 * 60 * 1000
+                val threeDaysFromNow = currentTime + threeDaysInMillis
+                val upcomingTasks = querySnapshot.toObjects(Task::class.java).filter {
+                    it.dueDate > currentTime && it.dueDate <= threeDaysFromNow && !it.status.equals("Complete", ignoreCase = true)
+                }.sortedBy { it.dueDate }
+                onSuccess(upcomingTasks)
             }
             .addOnFailureListener { e ->
                 onFailure(e)
