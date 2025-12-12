@@ -49,8 +49,12 @@ class NotificationAdapter(
 
     inner class NotificationViewHolder(private val binding: ItemNotificationBinding) : RecyclerView.ViewHolder(binding.root) {
         fun bind(notification: Notification, isSelectionMode: Boolean, isSelected: Boolean) {
-            binding.notificationTitle.text = notification.title
-            binding.notificationMessage.text = notification.message
+            val messageParts = notification.message.split(":", limit = 2)
+            val title = if (messageParts.isNotEmpty()) messageParts[0] else ""
+            val message = if (messageParts.size > 1) messageParts[1].trim() else ""
+
+            binding.notificationTitle.text = title
+            binding.notificationMessage.text = message
             binding.notificationTimestamp.text = SimpleDateFormat("hh:mm a, dd/MM/yy", Locale.getDefault()).format(Date(notification.timestamp))
 
             if (notification.isRead) {

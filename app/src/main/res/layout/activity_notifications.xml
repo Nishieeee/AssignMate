@@ -118,4 +118,14 @@
         app:layout_behavior="@string/appbar_scrolling_view_behavior"
         tools:listitem="@layout/item_notification" />
 
+    <TextView
+        android:id="@+id/emptyView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="You have no notifications."
+        android:textSize="18sp"
+        android:visibility="gone"
+        app:layout_anchor="@id/notifications_recycler_view"
+        app:layout_anchorGravity="center" />
+
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

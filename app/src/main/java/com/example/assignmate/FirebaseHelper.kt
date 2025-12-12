@@ -1,5 +1,6 @@
 package com.example.assignmate
 
+import android.util.Log
 import com.example.assignmate.model.Comment
 import com.example.assignmate.model.Group
 import com.example.assignmate.model.Label
@@ -366,16 +367,24 @@ class FirebaseHelper {
             .addOnFailureListener { e -> onFailure(e) }
     }
 
-    fun addComment(comment: Comment, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
+    fun addComment(comment: Comment, onSuccess: (String) -> Unit, onFailure: (Exception) -> Unit) {
         commentsCollection.add(comment)
-            .addOnSuccessListener { onSuccess() }
+            .addOnSuccessListener { documentReference ->
+                onSuccess(documentReference.id)
+            }
             .addOnFailureListener { e -> onFailure(e) }
     }
 
     fun addNotification(notification: Notification, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
         notificationsCollection.add(notification)
-            .addOnSuccessListener { onSuccess() }
-            .addOnFailureListener { e -> onFailure(e) }
+            .addOnSuccessListener { 
+                Log.d("FirebaseHelper", "Notification added successfully")
+                onSuccess()
+             }
+            .addOnFailureListener { e -> 
+                Log.e("FirebaseHelper", "Failed to add notification", e)
+                onFailure(e) 
+            }
     }
 
     fun getNotificationsForUser(userId: String, onSuccess: (List<Notification>) -> Unit, onFailure: (Exception) -> Unit) {
@@ -435,9 +444,11 @@ class FirebaseHelper {
             .addOnFailureListener { e -> onFailure(e) }
     }
 
-    fun createTask(task: Task, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
+    fun createTask(task: Task, onSuccess: (String) -> Unit, onFailure: (Exception) -> Unit) {
         tasksCollection.add(task)
-            .addOnSuccessListener { onSuccess() }
+            .addOnSuccessListener { documentReference ->
+                onSuccess(documentReference.id)
+            }
             .addOnFailureListener { e -> onFailure(e) }
     }
 

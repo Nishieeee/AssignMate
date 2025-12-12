@@ -34,12 +34,18 @@ class NotificationHelper(private val context: Context) {
     fun sendNotification(notification: Notification, notificationId: Int) {
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notifications) // Ensure you have this drawable
-            .setContentTitle(notification.title)
+            .setContentTitle("AssignMate")
             .setContentText(notification.message)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
 
-        firebaseHelper.addNotification(notification, {}, {})
-        notificationManager.notify(notificationId, builder.build())
+        firebaseHelper.addNotification(notification, 
+            onSuccess = { 
+                notificationManager.notify(notificationId, builder.build())
+            }, 
+            onFailure = { 
+                // Do nothing
+            }
+        )
     }
 }

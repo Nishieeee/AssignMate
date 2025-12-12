@@ -1,7 +1,9 @@
 package com.example.assignmate
 
 import android.os.Bundle
+import android.util.Log
 import android.view.View
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -25,6 +27,13 @@ class NotificationsActivity : AppCompatActivity() {
 
         firebaseHelper = FirebaseHelper()
         currentUserId = intent.getStringExtra("USER_ID") ?: ""
+
+        if (currentUserId.isEmpty()) {
+            Log.e("NotificationsActivity", "USER_ID extra is missing or empty. Cannot load notifications.")
+            Toast.makeText(this, "Could not load user data. Please try again.", Toast.LENGTH_LONG).show()
+            finish() // Exit the activity since it's in an invalid state.
+            return   // Stop further execution of onCreate.
+        }
 
         setupToolbar()
         setupRecyclerView()
@@ -53,11 +62,27 @@ class NotificationsActivity : AppCompatActivity() {
     }
 
     private fun loadNotifications() {
-        firebaseHelper.getNotificationsForUser(currentUserId, {
-            notifications.clear()
-            notifications.addAll(it)
-            notificationAdapter.notifyDataSetChanged()
-        }, {})
+        firebaseHelper.getNotificationsForUser(currentUserId, 
+            onSuccess = {
+                notifications.clear()
+                notifications.addAll(it)
+                notificationAdapter.notifyDataSetChanged()
+
+                if (notifications.isEmpty()) {
+                    binding.emptyView.visibility = View.VISIBLE
+                    binding.notificationsRecyclerView.visibility = View.GONE
+                } else {
+                    binding.emptyView.visibility = View.GONE
+                    binding.notificationsRecyclerView.visibility = View.VISIBLE
+                }
+            },
+            onFailure = { e ->
+                Log.e("NotificationsActivity", "Error loading notifications", e)
+                Toast.makeText(this, "Failed to load notifications", Toast.LENGTH_SHORT).show()
+                binding.emptyView.visibility = View.VISIBLE
+                binding.notificationsRecyclerView.visibility = View.GONE
+            }
+        )
     }
 
     private fun setupClickListeners() {

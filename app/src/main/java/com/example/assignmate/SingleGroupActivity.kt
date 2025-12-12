@@ -38,6 +38,7 @@ class SingleGroupActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivitySingleGroupBinding
     private lateinit var firebaseHelper: FirebaseHelper
+    private lateinit var notificationHelper: NotificationHelper
     private var groupId: String = ""
     private var currentUserId: String = ""
     private var currentUserRole: String? = null
@@ -49,6 +50,7 @@ class SingleGroupActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         firebaseHelper = FirebaseHelper()
+        notificationHelper = NotificationHelper(this)
         groupId = intent.getStringExtra("GROUP_ID") ?: ""
         currentUserId = intent.getStringExtra("USER_ID") ?: ""
 
@@ -392,9 +394,16 @@ class SingleGroupActivity : AppCompatActivity() {
             )
 
             firebaseHelper.createTask(task,
-                onSuccess = {
+                onSuccess = { taskId ->
                     Toast.makeText(this, "Task created successfully", Toast.LENGTH_SHORT).show()
                     loadTasks()
+                    firebaseHelper.getGroup(groupId, {
+                        val groupName = it?.name ?: "a group"
+                        val notificationMessage = "You have been assigned a new task: $taskName in $groupName"
+                        assignedTo.forEach { userId ->
+                            notificationHelper.sendNotification(com.example.assignmate.model.Notification(userId = userId, message = notificationMessage, taskId = taskId), userId.hashCode())
+                        }
+                    }, {})
                 },
                 onFailure = {
                     Toast.makeText(this, "Failed to create task", Toast.LENGTH_SHORT).show()
