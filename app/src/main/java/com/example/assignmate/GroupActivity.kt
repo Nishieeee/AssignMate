@@ -91,7 +91,7 @@ class GroupActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItem
             onGroupClicked = { group ->
                 val intent = Intent(this, SingleGroupActivity::class.java)
                 intent.putExtra("GROUP_NAME", group.name)
-                intent.putExtra("GROUP_ID", group.uid)
+                intent.putExtra("GROUP_ID", group.id)
                 intent.putExtra("USER_ID", currentUserId)
                 startActivity(intent)
             },
@@ -103,7 +103,7 @@ class GroupActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItem
             },
             onFavouriteClicked = { group ->
                 val isFavourite = group.favouriteBy.contains(currentUserId)
-                firebaseHelper.setFavourite(group.uid, currentUserId, !isFavourite, {
+                firebaseHelper.setFavourite(group.id, currentUserId, !isFavourite, {
                     loadGroups()
                     val message = if (!isFavourite) "Group added to favourites" else "Group removed from favourites"
                     Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
@@ -127,7 +127,7 @@ class GroupActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItem
                 val updatedGroups = mutableListOf<Group>()
                 var groupsProcessed = 0
                 for (group in groups) {
-                    firebaseHelper.getTasksForGroup(group.uid, {
+                    firebaseHelper.getTasksForGroup(group.id, {
                         val progress = calculateProgress(it)
                         val assignedTasksCount = it.count { task -> task.assignedTo.contains(currentUserId) }
                         updatedGroups.add(group.copy(progress = progress, assignedTasksCount = assignedTasksCount))
@@ -304,7 +304,7 @@ class GroupActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItem
             val newGroupDescription = groupDescriptionInput.text.toString()
 
             if (newGroupName.isNotEmpty()) {
-                firebaseHelper.updateGroup(group.uid, newGroupName, newGroupDescription,
+                firebaseHelper.updateGroup(group.id, newGroupName, newGroupDescription,
                     onSuccess = {
                         Toast.makeText(this, "Group updated successfully", Toast.LENGTH_SHORT).show()
                         loadGroups()
@@ -328,7 +328,7 @@ class GroupActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItem
             .setTitle("Delete Group")
             .setMessage("Are you sure you want to delete \"${group.name}\"?")
             .setPositiveButton("Delete") { _, _ ->
-                firebaseHelper.deleteGroup(group.uid,
+                firebaseHelper.deleteGroup(group.id,
                     onSuccess = {
                         Toast.makeText(this, "Group deleted", Toast.LENGTH_SHORT).show()
                         loadGroups()
@@ -349,6 +349,20 @@ class GroupActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItem
             .joinToString("")
     }
 
+    private fun updateNotificationBadge(){
+        val notificationBadge = findViewById<TextView>(R.id.notification_badge)
+        if (currentUserId.isNotEmpty()) {
+            firebaseHelper.getUnreadNotificationCount(currentUserId, {
+                if(it > 0){
+                    notificationBadge.visibility = View.VISIBLE
+                    notificationBadge.text = it.toString()
+                }else{
+                    notificationBadge.visibility = View.GONE
+                }
+            }, {})
+        }
+    }
+    
     override fun onNavigationItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
             R.id.action_home -> {
@@ -359,7 +373,6 @@ class GroupActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItem
                 return true
             }
             R.id.action_groups -> {
-                // Already here
                 return true
             }
             R.id.action_create -> {
@@ -382,19 +395,5 @@ class GroupActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItem
             }
         }
         return false
-    }
-
-    private fun updateNotificationBadge() {
-        val notificationBadge = findViewById<TextView>(R.id.notification_badge)
-        if (currentUserId.isNotEmpty()) {
-            firebaseHelper.getUnreadNotificationCount(currentUserId, {
-                if (it > 0) {
-                    notificationBadge.visibility = View.VISIBLE
-                    notificationBadge.text = it.toString()
-                } else {
-                    notificationBadge.visibility = View.GONE
-                }
-            }, {})
-        }
     }
 }

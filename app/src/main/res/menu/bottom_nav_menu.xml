@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/action_home"
+        android:icon="@drawable/ic_home"
+        android:title="Home" />
+    <item
+        android:id="@+id/action_groups"
+        android:icon="@drawable/ic_group"
+        android:title="Groups" />
+    <item
+        android:id="@+id/action_create"
+        android:icon="@drawable/ic_add_circle"
+        android:title="Create" />
+    <item
+        android:id="@+id/action_tasks"
+        android:icon="@drawable/ic_tasks"
+        android:title="Tasks" />
+    <item
+        android:id="@+id/action_profile"
+        android:icon="@drawable/ic_profile"
+        android:title="Profile" />
+</menu>

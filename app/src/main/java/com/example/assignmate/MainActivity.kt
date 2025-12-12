@@ -18,6 +18,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.assignmate.adapter.FavouriteGroupAdapter
 import com.example.assignmate.adapter.UpcomingTasksAdapter
 import com.example.assignmate.databinding.ActivityMainBinding
+import com.example.assignmate.model.Group
 
 class MainActivity : AppCompatActivity() {
 
@@ -118,12 +119,12 @@ class MainActivity : AppCompatActivity() {
                     binding.favouriteGroupsRecyclerView.visibility = View.VISIBLE
                     binding.noFavouriteGroupText.visibility = View.GONE
                     binding.favouriteGroupsRecyclerView.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
-                    binding.favouriteGroupsRecyclerView.adapter = FavouriteGroupAdapter(favouriteGroups) { group ->
+                    binding.favouriteGroupsRecyclerView.adapter = FavouriteGroupAdapter(favouriteGroups, { group ->
                         val intent = Intent(this, SingleGroupActivity::class.java)
-                        intent.putExtra("GROUP_ID", group.uid)
+                        intent.putExtra("GROUP_ID", group.id)
                         intent.putExtra("USER_ID", currentUserId)
                         startActivity(intent)
-                    }
+                    })
                 }
             },
             onFailure = { binding.totalGroups.text = "0" }
@@ -160,7 +161,7 @@ class MainActivity : AppCompatActivity() {
                         intent.putExtra("USER_ID", currentUserId)
                         startActivity(intent)
                     }, { groupId, callback ->
-                        firebaseHelper.getGroup(groupId, callback, {})
+                        firebaseHelper.getGroup(groupId, { group -> callback(group) }, { e: Exception -> })
                     })
                     binding.upcomingDeadlinesRecyclerView.adapter = adapter
                 }

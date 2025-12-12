@@ -40,6 +40,7 @@ class SingleGroupActivity : AppCompatActivity() {
     private lateinit var firebaseHelper: FirebaseHelper
     private lateinit var notificationHelper: NotificationHelper
     private var groupId: String = ""
+    private var groupName: String = ""
     private var currentUserId: String = ""
     private var currentUserRole: String? = null
     private var allTasks = listOf<Task>()
@@ -61,6 +62,7 @@ class SingleGroupActivity : AppCompatActivity() {
             onSuccess = {
                 if (it != null) {
                     supportActionBar?.title = it.name
+                    groupName = it.name
                     currentUserRole = it.members[currentUserId]
                     if (currentUserRole == "leader" || currentUserRole == "co-leader") {
                         binding.fabAddTaskButton.visibility = View.VISIBLE
@@ -386,6 +388,7 @@ class SingleGroupActivity : AppCompatActivity() {
                 name = taskName,
                 description = taskDescription,
                 groupId = groupId,
+                groupName = groupName,
                 dueDate = finalDueDate,
                 assignedTo = assignedTo,
                 status = "Not Started",

@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.PopupMenu
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -52,26 +53,35 @@ class GroupTasksFragment : Fragment() {
     fun displayTasks(tasks: List<Task>) {
         val currentUserId = (activity as? SingleGroupActivity)?.intent?.getStringExtra("USER_ID") ?: ""
         if (isAdded) {
-            taskAdapter = TaskAdapter(tasks, currentUserId,
-                onItemClicked = { task ->
+            taskAdapter = TaskAdapter(tasks.toMutableList(),
+                onTaskClick = { task ->
                     val intent = Intent(requireContext(), TaskDetailActivity::class.java).apply {
                         putExtra("TASK_ID", task.uid)
                         putExtra("USER_ID", currentUserId)
                     }
                     taskDetailLauncher.launch(intent)
                 },
-                onDeleteClicked = { task ->
-                    showDeleteConfirmationDialog(task)
-                },
-                getUsers = { userIds, callback ->
-                    firebaseHelper.getUsers(userIds, callback, {})
-                },
-                getLabels = { groupId, callback ->
-                    firebaseHelper.getLabelsForGroup(groupId, callback, {})
+                onTaskOptionsClick = { task, view ->
+                    showTaskOptionsMenu(task, view)
                 }
             )
             tasksRecyclerView.adapter = taskAdapter
         }
+    }
+
+    private fun showTaskOptionsMenu(task: Task, view: View) {
+        val popup = PopupMenu(requireContext(), view)
+        popup.menuInflater.inflate(R.menu.task_options_menu, popup.menu)
+        popup.setOnMenuItemClickListener { menuItem ->
+            when (menuItem.itemId) {
+                R.id.action_delete_task -> {
+                    showDeleteConfirmationDialog(task)
+                    true
+                }
+                else -> false
+            }
+        }
+        popup.show()
     }
 
     private fun showDeleteConfirmationDialog(task: Task) {
