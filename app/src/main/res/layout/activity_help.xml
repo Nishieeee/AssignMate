@@ -4,6 +4,8 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="#FFF8F0"
+    android:backgroundTint="#FFF8F0"
     tools:context=".HelpActivity">
 
     <com.google.android.material.appbar.AppBarLayout
@@ -14,7 +16,8 @@
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize" />
+            android:layout_height="?attr/actionBarSize"
+            android:background="#FFF8F0" />
 
     </com.google.android.material.appbar.AppBarLayout>
 
@@ -36,14 +39,14 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:textStyle="bold"
-            android:text="Contact Us:" />
+            android:text="Contact Us:"
+            android:textStyle="bold" />
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="If you need help or have any questions, please feel free to contact us."/>
+            android:text="If you need help or have any questions, please feel free to contact us." />
 
         <TextView
             android:layout_width="match_parent"

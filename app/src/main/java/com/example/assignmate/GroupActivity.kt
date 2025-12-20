@@ -26,11 +26,13 @@ import com.example.assignmate.databinding.ActivityGroupBinding
 import com.example.assignmate.model.Group
 import com.example.assignmate.model.Task
 import com.google.android.material.bottomnavigation.BottomNavigationView
+import com.google.firebase.auth.FirebaseAuth
 
 class GroupActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItemSelectedListener {
 
     private lateinit var binding: ActivityGroupBinding
     private lateinit var firebaseHelper: FirebaseHelper
+    private lateinit var auth: FirebaseAuth
     private lateinit var groupAdapter: GroupAdapter
     private val groups = mutableListOf<Group>()
     private var currentUserId: String = ""
@@ -39,7 +41,6 @@ class GroupActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItem
     private var currentRemoveImageButton: ImageButton? = null
     private var currentUploadImageButton: TextView? = null
 
-    // Changed to GetContent for simpler image picking
     private val pickImageLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null) {
             selectedImageUri = uri
@@ -57,7 +58,9 @@ class GroupActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItem
         setContentView(binding.root)
 
         firebaseHelper = FirebaseHelper()
-        currentUserId = intent.getStringExtra("USER_ID") ?: ""
+        auth = FirebaseAuth.getInstance()
+        // Prioritize FirebaseAuth user ID
+        currentUserId = auth.currentUser?.uid ?: intent.getStringExtra("USER_ID") ?: ""
 
         setupRecyclerView()
         setupFilterAndSort()
@@ -77,23 +80,30 @@ class GroupActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItem
             intent.putExtra("USER_ID", currentUserId)
             startActivity(intent)
         }
+
+        if (intent.getBooleanExtra("SHOW_CREATE_DIALOG", false)) {
+            showCreateGroupDialog()
+        }
     }
 
     override fun onResume() {
         super.onResume()
+        currentUserId = auth.currentUser?.uid ?: intent.getStringExtra("USER_ID") ?: ""
         loadGroups()
         updateNotificationBadge()
     }
 
     private fun setupFilterAndSort(){
-        val filterOptions = arrayOf("All", "Favourite", "Date Created", "Last Updated", "Most Tasks Assigned")
+        val filterOptions = arrayOf("All", "Leader", "Co-leader/Member", "Favourite")
         val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, filterOptions)
         binding.filterDropdown.setAdapter(adapter)
+        binding.filterDropdown.setText(filterOptions[0], false)
 
         binding.searchInput.addTextChangedListener(object: TextWatcher{
             override fun afterTextChanged(s: Editable?) {
                 val query = s.toString()
-                groupAdapter.filter(query)
+                val currentFilter = binding.filterDropdown.text.toString()
+                groupAdapter.filter(currentFilter, query)
                 updateUI()
             }
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -101,7 +111,10 @@ class GroupActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItem
         })
 
         binding.filterDropdown.setOnItemClickListener { _, _, position, _ ->
-            loadGroups()
+            val selectedFilter = filterOptions[position]
+            val currentQuery = binding.searchInput.text.toString()
+            groupAdapter.filter(selectedFilter, currentQuery)
+            updateUI()
         }
     }
 
@@ -141,6 +154,8 @@ class GroupActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItem
     }
 
     private fun loadGroups() {
+        if (currentUserId.isEmpty()) return
+
         firebaseHelper.getGroupsForUser(currentUserId,
             onSuccess = { groups ->
                 val updatedGroups = mutableListOf<Group>()

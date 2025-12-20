@@ -20,15 +20,19 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.bumptech.glide.Glide
 import com.example.assignmate.adapter.FavouriteGroupAdapter
+import com.example.assignmate.adapter.UpcomingItem
 import com.example.assignmate.adapter.UpcomingTasksAdapter
 import com.example.assignmate.databinding.ActivityMainBinding
 import com.example.assignmate.model.Group
 import com.example.assignmate.model.Task
+import com.google.android.material.bottomnavigation.BottomNavigationView
+import com.google.firebase.auth.FirebaseAuth
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var firebaseHelper: FirebaseHelper
+    private lateinit var auth: FirebaseAuth
     private var currentUserId: String = ""
     private var selectedImageUri: Uri? = null
     private var currentGroupImagePreview: ImageView? = null
@@ -53,8 +57,9 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         firebaseHelper = FirebaseHelper()
-
-        currentUserId = intent.getStringExtra("USER_ID") ?: ""
+        auth = FirebaseAuth.getInstance()
+        // Use FirebaseAuth as primary source, fallback to Intent
+        currentUserId = auth.currentUser?.uid ?: intent.getStringExtra("USER_ID") ?: ""
 
         binding.notificationBell.setOnClickListener {
             val intent = Intent(this, NotificationsActivity::class.java)
@@ -62,7 +67,8 @@ class MainActivity : AppCompatActivity() {
             startActivity(intent)
         }
 
-        binding.bottomNavigation.setOnItemSelectedListener { item ->
+        val bottomNavigationView = findViewById<BottomNavigationView>(R.id.bottom_navigation)
+        bottomNavigationView.setOnItemSelectedListener { item ->
             when (item.itemId) {
                 R.id.action_home -> {
                     // Already on the home screen, do nothing
@@ -97,10 +103,14 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        // Re-fetch current user ID just in case
+        currentUserId = auth.currentUser?.uid ?: intent.getStringExtra("USER_ID") ?: ""
         updateUserInfo()
     }
 
     private fun updateUserInfo() {
+        if (currentUserId.isEmpty()) return
+
         firebaseHelper.getUserDetails(currentUserId,
             onSuccess = {
                 if (it != null) {
@@ -194,16 +204,36 @@ class MainActivity : AppCompatActivity() {
             onFailure = { binding.dueTasks.text = "0" }
         )
 
-        firebaseHelper.getUpcomingTasksForUser(currentUserId,
-            onSuccess = {
-                if (it.isEmpty()) {
+        firebaseHelper.getUpcomingTasksForUser(currentUserId, true,
+            onSuccess = { leaderGroupTasks, userTasks ->
+                val upcomingItems = mutableListOf<UpcomingItem>()
+                
+                leaderGroupTasks.forEach { (group, tasks) ->
+                    if (tasks.isNotEmpty()) {
+                        val earliestTask = tasks.minByOrNull { it.dueDate }
+                        val earliestDueDate = earliestTask?.dueDate ?: 0L
+                        upcomingItems.add(UpcomingItem.GroupSummaryItem(group, tasks.size, earliestDueDate))
+                    }
+                }
+                
+                userTasks.forEach { task ->
+                    upcomingItems.add(UpcomingItem.TaskItem(task))
+                }
+                
+                val sortedUserTasks = userTasks.sortedBy { it.dueDate }
+                
+                val finalItems = mutableListOf<UpcomingItem>()
+                finalItems.addAll(upcomingItems.filterIsInstance<UpcomingItem.GroupSummaryItem>())
+                finalItems.addAll(sortedUserTasks.map { UpcomingItem.TaskItem(it) })
+
+                if (finalItems.isEmpty()) {
                     binding.upcomingDeadlinesRecyclerView.visibility = View.GONE
                     binding.noUpcomingDeadlinesText.visibility = View.VISIBLE
                 } else {
                     binding.upcomingDeadlinesRecyclerView.visibility = View.VISIBLE
                     binding.noUpcomingDeadlinesText.visibility = View.GONE
                     binding.upcomingDeadlinesRecyclerView.layoutManager = LinearLayoutManager(this)
-                    val adapter = UpcomingTasksAdapter(it, {
+                    val adapter = UpcomingTasksAdapter(finalItems, {
                         task ->
                         val intent = Intent(this, TaskDetailActivity::class.java)
                         intent.putExtra("TASK_ID", task.uid)

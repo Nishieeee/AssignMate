@@ -38,17 +38,41 @@ class GroupAdapter(
 
     fun setGroups(groups: List<Group>){
         this.allGroups = ArrayList(groups)
-        filter("") // Initially show all groups
+        filter("All", "") // Initially show all groups
     }
 
-    fun filter(query: String) {
-        val filteredList = allGroups.filter { group ->
-            group.name.contains(query, ignoreCase = true) ||
-                    group.description.contains(query, ignoreCase = true)
+    fun filter(filterType: String, query: String) {
+        var filteredList = when (filterType) {
+            "Favourite" -> allGroups.filter { it.favouriteBy.contains(currentUserId) }
+            "Leader" -> allGroups.filter { it.members[currentUserId] == "leader" }
+            "Co-leader/Member" -> allGroups.filter { it.members[currentUserId] == "co-leader" || it.members[currentUserId] == "member" }
+            else -> allGroups
         }
+
+        if (query.isNotEmpty()) {
+            filteredList = filteredList.filter { group ->
+                group.name.contains(query, ignoreCase = true) ||
+                        group.description.contains(query, ignoreCase = true)
+            }
+        }
+        
+        // Sorting logic based on filterType if needed, but for now sorting is not explicitly requested other than filtering
+        // The original logic had sorting options in the dropdown text, let's respect that if they were combined
+        // But the prompt asked for filtering by Leader vs Member.
+        // If the dropdown also includes sort options like "Date Created", we should handle them.
+        // Based on GroupActivity.kt: "All", "Favourite", "Date Created", "Last Updated", "Most Tasks Assigned"
+        // Wait, I replaced the dropdown options in GroupActivity.kt in the previous turn.
+        // The new options are: "All", "Leader", "Co-leader/Member", "Favourite".
+        // So I don't need to handle sorting here anymore unless requested.
+
         groups.clear()
         groups.addAll(filteredList)
         notifyDataSetChanged()
+    }
+
+    // Overload for backward compatibility if needed, but GroupActivity uses the new signature
+    fun filter(query: String) {
+        filter("All", query)
     }
 
     inner class GroupViewHolder(private val binding: ItemGroupCardBinding) : RecyclerView.ViewHolder(binding.root) {

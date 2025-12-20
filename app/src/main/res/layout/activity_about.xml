@@ -4,6 +4,8 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="#FFF8F0"
+    android:backgroundTint="#FFF8F0"
     tools:context=".AboutActivity">
 
     <com.google.android.material.appbar.AppBarLayout
@@ -14,7 +16,9 @@
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize" />
+            android:layout_height="?attr/actionBarSize"
+            android:background="#FFF8F0"
+            android:backgroundTint="#FFF8F0" />
 
     </com.google.android.material.appbar.AppBarLayout>
 
@@ -22,6 +26,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_below="@id/appBarLayout"
+        android:background="#FFF8F0"
+        android:backgroundTint="#FFF8F0"
         android:orientation="vertical"
         android:padding="16dp">
 
@@ -42,13 +48,14 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:textStyle="bold"
-            android:text="Creators:" />
+            android:text="Creators:"
+            android:textStyle="bold" />
 
         <TextView
+            android:id="@+id/back"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="- John Smith\n- Jane Doe\n- Peter Jones" />
+            android:text="- Iris Juhra B. Abdulla\n- Jhon Clein T. Pagarogan\n- Graziella Marife S. Saavedra" />
 
     </LinearLayout>
 

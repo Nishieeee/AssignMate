@@ -18,7 +18,6 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -30,6 +29,8 @@ import java.util.UUID
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 class FirebaseHelper {
 
@@ -152,9 +153,21 @@ class FirebaseHelper {
                     return@addOnSuccessListener
                 }
                 val groupDoc = querySnapshot.documents.first()
+                val group = groupDoc.toObject(Group::class.java)
                 val newMember = mapOf("members.$userId" to "member")
                 groupsCollection.document(groupDoc.id).update(newMember)
                     .addOnSuccessListener {
+                        // Notify group leader about the new member
+                        getUserDetails(userId, { user ->
+                            if (group != null) {
+                                notifyLeaders(
+                                    groupId = group.id,
+                                    title = "Member Joined",
+                                    content = "${user?.username} joined ${group.name}",
+                                    excludeUserId = userId
+                                )
+                            }
+                        }, {})
                         onSuccess()
                     }
                     .addOnFailureListener { e ->
@@ -349,7 +362,6 @@ class FirebaseHelper {
         endCalendar.set(Calendar.MILLISECOND, 999)
         val endMillis = endCalendar.timeInMillis
 
-        // Fetch all tasks for the user and filter in memory to avoid missing index issues
         tasksCollection.whereArrayContains("assignedTo", userId)
             .get()
             .addOnSuccessListener { querySnapshot ->
@@ -435,6 +447,27 @@ class FirebaseHelper {
     }
 
     fun removeMemberFromGroup(groupId: String, userId: String, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
+        // Notification Logic before removal
+        val currentActorId = auth.currentUser?.uid ?: ""
+        getUserDetails(userId, { removedUser ->
+            getGroup(groupId, { group ->
+                getUserDetails(currentActorId, { actor ->
+                    if (group != null && removedUser != null) {
+                        val title = if (userId == currentActorId) "Member Left" else "Member Removed"
+                        val action = if (userId == currentActorId) "left" else "was removed from"
+                        val byText = if (userId != currentActorId) " by ${actor?.username}" else ""
+                        
+                        notifyLeaders(
+                            groupId = groupId,
+                            title = title,
+                            content = "${removedUser.username} $action ${group.name}$byText",
+                            excludeUserId = currentActorId
+                        )
+                    }
+                }, {})
+            }, {})
+        }, {})
+
         val updates = mapOf("members.$userId" to FieldValue.delete())
         groupsCollection.document(groupId).update(updates)
             .addOnSuccessListener { onSuccess() }
@@ -444,7 +477,21 @@ class FirebaseHelper {
     fun updateMemberRole(groupId: String, userId: String, role: String, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
         val updates = mapOf("members.$userId" to role)
         groupsCollection.document(groupId).update(updates)
-            .addOnSuccessListener { onSuccess() }
+            .addOnSuccessListener {
+                if (role == "co-leader") {
+                    getGroup(groupId, { group ->
+                        group?.let {
+                             val notification = Notification(
+                                userId = userId,
+                                message = "Role Update: You have been promoted to co-leader in ${it.name}",
+                                timestamp = System.currentTimeMillis()
+                            )
+                            addNotification(notification, {}, {})
+                        }
+                    }, {})
+                }
+                onSuccess()
+            }
             .addOnFailureListener { e -> onFailure(e) }
     }
 
@@ -471,18 +518,81 @@ class FirebaseHelper {
         onSuccess: () -> Unit,
         onFailure: (Exception) -> Unit
     ) {
-        val updates = mutableMapOf<String, Any?>(
-            "name" to title,
-            "description" to description,
-            "dueDate" to dueDate,
-            "status" to status,
-            "assignedTo" to assignedTo,
-            "subtasks" to subtasks,
-            "labels" to labels
-        )
-        tasksCollection.document(taskId).update(updates)
-            .addOnSuccessListener { onSuccess() }
-            .addOnFailureListener { e -> onFailure(e) }
+        val currentUserId = auth.currentUser?.uid ?: ""
+
+        getTask(taskId, { oldTask ->
+            if (oldTask == null) {
+                onFailure(Exception("Task not found for update"))
+                return@getTask
+            }
+
+            val updates = mutableMapOf<String, Any?>(
+                "name" to title,
+                "description" to description,
+                "dueDate" to dueDate,
+                "status" to status,
+                "assignedTo" to assignedTo,
+                "subtasks" to subtasks,
+                "labels" to labels
+            )
+            
+            tasksCollection.document(taskId).update(updates)
+                .addOnSuccessListener {
+                    getUserDetails(currentUserId, { currentUser ->
+                        val actorName = currentUser?.username ?: "Someone"
+                        
+                        // 1. Status Changes
+                        if (oldTask.status != status) {
+                            if (status.equals("Complete", ignoreCase = true)) {
+                                // Task Completed
+                                notifyLeaders(oldTask.groupId, "Task Completed", "$actorName completed task '$title' in ${oldTask.groupName}", excludeUserId = currentUserId, taskId = taskId)
+                                assignedTo?.let {
+                                     notifyUsers(it, "Task Completed", "Task '$title' in ${oldTask.groupName} was completed by $actorName", excludeUserId = currentUserId, taskId = taskId)
+                                }
+                            } else if (oldTask.status.equals("Complete", ignoreCase = true)) {
+                                // Task Reopened
+                                assignedTo?.let {
+                                    notifyUsers(it, "Task Reopened", "Task '$title' in ${oldTask.groupName} was reopened by $actorName", excludeUserId = currentUserId, taskId = taskId)
+                                }
+                            } else {
+                                // Status Update (e.g., In Progress)
+                                assignedTo?.let {
+                                     notifyUsers(it, "Task Updated", "Status of task '$title' in ${oldTask.groupName} changed to $status by $actorName", excludeUserId = currentUserId, taskId = taskId)
+                                }
+                            }
+                        }
+                        
+                        // 2. Deadline Changes
+                        if (oldTask.dueDate != dueDate && dueDate != null) {
+                            val formatter = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
+                            val dateString = formatter.format(java.util.Date(dueDate))
+                            assignedTo?.let {
+                                notifyUsers(it, "Deadline Changed", "Deadline for task '$title' in ${oldTask.groupName} changed to $dateString by $actorName", excludeUserId = currentUserId, taskId = taskId)
+                            }
+                        }
+
+                        // 3. Assignment Changes
+                        assignedTo?.forEach { userId ->
+                            if (!oldTask.assignedTo.contains(userId)) {
+                                // New Assignment
+                                notifyUsers(listOf(userId), "New Task Assigned", "You were assigned the task '$title' in ${oldTask.groupName} by $actorName", excludeUserId = currentUserId, taskId = taskId)
+                            }
+                        }
+                        
+                        // 4. General Edit (if not completed and not just created)
+                        // Trigger 'Task Edited' for leaders if it's a significant edit and not just a status change we already notified about
+                        if (status == oldTask.status && (title != oldTask.name || description != oldTask.description)) {
+                             notifyLeaders(oldTask.groupId, "Task Edited", "$actorName edited task '$title' in ${oldTask.groupName}", excludeUserId = currentUserId, taskId = taskId)
+                             assignedTo?.let {
+                                 notifyUsers(it, "Task Updated", "Details for task '$title' in ${oldTask.groupName} were updated by $actorName", excludeUserId = currentUserId, taskId = taskId)
+                             }
+                        }
+
+                    }, {})
+                    onSuccess()
+                }
+                .addOnFailureListener { e -> onFailure(e) }
+        }, { e -> onFailure(e) })
     }
 
     fun getCommentsForTask(taskId: String, onSuccess: (List<Comment>) -> Unit, onFailure: (Exception) -> Unit) {
@@ -495,18 +605,45 @@ class FirebaseHelper {
     }
 
     fun addComment(comment: Comment, onSuccess: (String) -> Unit, onFailure: (Exception) -> Unit) {
-        // Fetch username first
+        val currentUserId = auth.currentUser?.uid ?: ""
+        
         getUserDetails(comment.userId,
             onSuccess = { user ->
                 val commentWithUsername = comment.copy(username = user?.username ?: "Unknown User")
                 commentsCollection.add(commentWithUsername)
                     .addOnSuccessListener { documentReference ->
+                        getTask(comment.taskId, { task ->
+                            if (task != null) {
+                                val actorName = user?.username ?: "Someone"
+                                val taskName = task.name
+                                val groupName = task.groupName // Assumption: task has groupName. If not, fetch group. 
+                                // Task model has groupName.
+                                
+                                // Notify Assignees
+                                notifyUsers(
+                                    task.assignedTo, 
+                                    "New Comment", 
+                                    "$actorName commented on '$taskName'", 
+                                    excludeUserId = currentUserId, 
+                                    taskId = comment.taskId
+                                )
+                                
+                                // Notify Leaders
+                                notifyLeaders(
+                                    task.groupId,
+                                    "New Comment",
+                                    "$actorName commented on '$taskName'",
+                                    excludeUserId = currentUserId,
+                                    taskId = comment.taskId
+                                )
+                            }
+                        }, {})
+                        
                         onSuccess(documentReference.id)
                     }
                     .addOnFailureListener { e -> onFailure(e) }
             },
             onFailure = {
-                // Fallback if username fetch fails
                  commentsCollection.add(comment)
                     .addOnSuccessListener { documentReference ->
                         onSuccess(documentReference.id)
@@ -542,14 +679,14 @@ class FirebaseHelper {
     fun getNotificationsForUser(userId: String, onSuccess: (List<Notification>) -> Unit, onFailure: (Exception) -> Unit) {
         notificationsCollection.whereEqualTo("userId", userId).get()
             .addOnSuccessListener { querySnapshot ->
-                val notifications = querySnapshot.toObjects(Notification::class.java)
+                val notifications = querySnapshot.toObjects(Notification::class.java).sortedByDescending { it.timestamp }
                 onSuccess(notifications)
             }
             .addOnFailureListener { e -> onFailure(e) }
     }
 
     fun markNotificationAsRead(notificationId: String, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
-        notificationsCollection.document(notificationId).update("read", true)
+        notificationsCollection.document(notificationId).update("isRead", true)
             .addOnSuccessListener { onSuccess() }
             .addOnFailureListener { e -> onFailure(e) }
     }
@@ -559,7 +696,7 @@ class FirebaseHelper {
             .addOnSuccessListener { querySnapshot ->
                 val batch = db.batch()
                 for (document in querySnapshot.documents) {
-                    batch.update(document.reference, "read", true)
+                    batch.update(document.reference, "isRead", true)
                 }
                 batch.commit()
                     .addOnSuccessListener { onSuccess() }
@@ -589,7 +726,7 @@ class FirebaseHelper {
     }
 
     fun getUnreadNotificationCount(userId: String, onSuccess: (Int) -> Unit, onFailure: (Exception) -> Unit) {
-        notificationsCollection.whereEqualTo("userId", userId).whereEqualTo("read", false).get()
+        notificationsCollection.whereEqualTo("userId", userId).whereEqualTo("isRead", false).get()
             .addOnSuccessListener { querySnapshot ->
                 onSuccess(querySnapshot.size())
             }
@@ -599,6 +736,29 @@ class FirebaseHelper {
     fun createTask(task: Task, onSuccess: (String) -> Unit, onFailure: (Exception) -> Unit) {
         tasksCollection.add(task)
             .addOnSuccessListener { documentReference ->
+                val currentUserId = auth.currentUser?.uid ?: ""
+                getUserDetails(currentUserId, { user ->
+                    val actorName = user?.username ?: "Someone"
+                    
+                    // Notify Assigned Users
+                    notifyUsers(
+                        task.assignedTo,
+                        "New Task Assigned",
+                        "You were assigned the task '${task.name}' in group '${task.groupName}' by $actorName",
+                        excludeUserId = currentUserId,
+                        taskId = documentReference.id
+                    )
+                    
+                    // Notify Leaders
+                    notifyLeaders(
+                        task.groupId,
+                        "New Task Created",
+                        "$actorName created task '${task.name}' in ${task.groupName}",
+                        excludeUserId = currentUserId,
+                        taskId = documentReference.id
+                    )
+                }, {})
+
                 onSuccess(documentReference.id)
             }
             .addOnFailureListener { e -> onFailure(e) }
@@ -656,11 +816,6 @@ class FirebaseHelper {
         val contentResolver = context.contentResolver
         val mimeType = contentResolver.getType(uri)
         
-        // Determine resource_type
-        // "auto" usually detects PDF as 'image' (for thumbnailing) or 'raw'.
-        // If Cloudinary fails with "Invalid PDF file", it often means it tried 'image' and failed.
-        // For non-image/non-video files (like PDF), forcing 'raw' bypasses the image validation.
-        
         val isImage = mimeType?.startsWith("image/") == true
         val isVideo = mimeType?.startsWith("video/") == true
         
@@ -687,5 +842,36 @@ class FirebaseHelper {
                 override fun onReschedule(requestId: String, errorInfo: ErrorInfo) {}
             })
             .dispatch()
+    }
+    
+    // Notification Helpers
+    private fun notifyLeaders(groupId: String, title: String, content: String, excludeUserId: String? = null, taskId: String = "") {
+         getGroup(groupId, { group ->
+             group?.members?.forEach { (memberId, role) ->
+                 if ((role == "leader" || role == "co-leader") && memberId != excludeUserId) {
+                      val notification = Notification(
+                         userId = memberId,
+                         message = "$title: $content",
+                         taskId = taskId,
+                         timestamp = System.currentTimeMillis()
+                     )
+                     addNotification(notification, {}, {})
+                 }
+             }
+         }, {})
+    }
+
+    private fun notifyUsers(userIds: List<String>, title: String, content: String, excludeUserId: String? = null, taskId: String = "") {
+        userIds.forEach { userId ->
+            if (userId != excludeUserId) {
+                val notification = Notification(
+                     userId = userId,
+                     message = "$title: $content",
+                     taskId = taskId,
+                     timestamp = System.currentTimeMillis()
+                 )
+                 addNotification(notification, {}, {})
+            }
+        }
     }
 }

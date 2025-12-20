@@ -36,7 +36,6 @@ import com.example.assignmate.databinding.ActivityTaskDetailBinding
 import com.example.assignmate.model.Attachment
 import com.example.assignmate.model.Comment
 import com.example.assignmate.model.Label
-import com.example.assignmate.model.Notification
 import com.example.assignmate.model.Subtask
 import com.example.assignmate.model.Task
 import com.google.android.material.chip.Chip
@@ -50,7 +49,6 @@ class TaskDetailActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityTaskDetailBinding
     private lateinit var firebaseHelper: FirebaseHelper
-    private lateinit var notificationHelper: NotificationHelper
     private lateinit var taskId: String
     private lateinit var currentUserId: String
     private var originalTask: Task? = null
@@ -91,7 +89,6 @@ class TaskDetailActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         firebaseHelper = FirebaseHelper()
-        notificationHelper = NotificationHelper(this)
         taskId = intent.getStringExtra("TASK_ID") ?: ""
         currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
 
@@ -581,19 +578,6 @@ class TaskDetailActivity : AppCompatActivity() {
                     taskUpdated = true
                     hasUnsavedChanges = false
                     Toast.makeText(this, "Changes saved", Toast.LENGTH_SHORT).show()
-
-                    originalTask?.let { task ->
-                        Log.d("TaskDetailActivity", "Task update successful. Preparing to send notifications for task: ${task.name}")
-                        Log.d("TaskDetailActivity", "Assigned users: ${task.assignedTo}. Current user: $currentUserId")
-                        val notificationMessage = "Task updated: ${task.name}"
-                        task.assignedTo.forEach { userId ->
-                            if (userId != currentUserId) {
-                                Log.d("TaskDetailActivity", "Sending notification to user: $userId")
-                                notificationHelper.sendNotification(Notification(userId = userId, message = notificationMessage, taskId = taskId), userId.hashCode())
-                            }
-                        }
-                    }
-
                     finish()
                 },
                 onFailure = {
@@ -831,12 +815,6 @@ class TaskDetailActivity : AppCompatActivity() {
                     binding.commentInput.text?.clear()
                     attachedUris.clear()
                     binding.attachmentPreviewLayout.removeAllViews()
-                    val notificationMessage = "New comment on task: ${originalTask?.name}"
-                    originalTask?.assignedTo?.forEach { userId ->
-                        if (userId != currentUserId) {
-                            notificationHelper.sendNotification(Notification(userId = userId, message = notificationMessage, taskId = taskId), userId.hashCode())
-                        }
-                    }
                 },
                 onFailure = {
                     Toast.makeText(this, "Failed to add comment", Toast.LENGTH_SHORT).show()

@@ -9,6 +9,7 @@ import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
 import com.example.assignmate.databinding.ActivityRegisterBinding
+import com.google.firebase.auth.FirebaseAuth
 
 class RegisterActivity : AppCompatActivity() {
 
@@ -50,13 +51,17 @@ class RegisterActivity : AppCompatActivity() {
 
             firebaseHelper.registerUser(username, email, password,
                 onSuccess = {
+                    // Sign out the user immediately after registration
+                    FirebaseAuth.getInstance().signOut()
                     Toast.makeText(this, "Registration successful! Please log in.", Toast.LENGTH_SHORT).show()
                     val intent = Intent(this, LoginActivity::class.java)
+                    // Clear the back stack so the user can't go back to the registration screen
+                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                     startActivity(intent)
                     finish()
                 },
                 onFailure = {
-                    Toast.makeText(this, "Registration failed. Email may already be in use.", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "Registration failed: ${it.message}", Toast.LENGTH_SHORT).show()
                 }
             )
         }

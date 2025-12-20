@@ -36,7 +36,7 @@ class TaskActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItemS
 
         firebaseHelper = FirebaseHelper()
         auth = FirebaseAuth.getInstance()
-        currentUserId = auth.currentUser?.uid ?: ""
+        currentUserId = auth.currentUser?.uid ?: intent.getStringExtra("USER_ID") ?: ""
 
         setSupportActionBar(binding.toolbar)
         supportActionBar?.title = ""
@@ -111,6 +111,8 @@ class TaskActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItemS
     }
 
     private fun loadTasks() {
+        if (currentUserId.isEmpty()) return
+        
         binding.progressBar.visibility = View.VISIBLE
         firebaseHelper.getGroupsForUser(currentUserId, { groups ->
             val groupMap = groups.associateBy({ it.id }, { it.name })
@@ -270,6 +272,7 @@ class TaskActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItemS
 
     override fun onResume() {
         super.onResume()
+        currentUserId = auth.currentUser?.uid ?: intent.getStringExtra("USER_ID") ?: ""
         loadTasks()
         updateNotificationBadge()
     }
