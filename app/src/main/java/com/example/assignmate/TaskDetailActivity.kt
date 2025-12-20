@@ -8,6 +8,7 @@ import android.content.res.ColorStateList
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
 import android.text.Editable
 import android.text.TextWatcher
 import android.util.Log
@@ -19,6 +20,7 @@ import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -31,6 +33,7 @@ import com.example.assignmate.adapter.CommentAdapter
 import com.example.assignmate.adapter.SelectableLabelAdapter
 import com.example.assignmate.adapter.SubtaskAdapter
 import com.example.assignmate.databinding.ActivityTaskDetailBinding
+import com.example.assignmate.model.Attachment
 import com.example.assignmate.model.Comment
 import com.example.assignmate.model.Label
 import com.example.assignmate.model.Notification
@@ -700,8 +703,41 @@ class TaskDetailActivity : AppCompatActivity() {
         val previewView = LayoutInflater.from(this).inflate(R.layout.item_attachment_preview, binding.attachmentPreviewLayout, false)
         val imageView = previewView.findViewById<ImageView>(R.id.attachment_image)
         val closeButton = previewView.findViewById<ImageView>(R.id.remove_attachment_button)
+        val fileDetailsLayout = previewView.findViewById<LinearLayout>(R.id.file_details_layout)
+        val fileNameView = previewView.findViewById<TextView>(R.id.file_name)
+        val fileSizeView = previewView.findViewById<TextView>(R.id.file_size)
 
-        Glide.with(this).load(uri).into(imageView)
+        // Get file info
+        var filename = "unknown_file"
+        var size = 0L
+        val contentResolver = contentResolver
+        val mimeType = contentResolver.getType(uri)
+        val isImage = mimeType?.startsWith("image/") == true
+
+        // Query metadata
+        contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+            val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+            if (cursor.moveToFirst()) {
+                if (nameIndex != -1) filename = cursor.getString(nameIndex)
+                if (sizeIndex != -1) size = cursor.getLong(sizeIndex)
+            }
+        }
+
+        if (isImage) {
+            // It's an image, show thumbnail, hide details text
+            Glide.with(this).load(uri).into(imageView)
+            fileDetailsLayout.visibility = View.GONE
+        } else {
+            // It's a file, show generic icon + details
+            imageView.setImageResource(R.drawable.ic_attach_file)
+            imageView.scaleType = ImageView.ScaleType.FIT_CENTER
+            
+            // Show details
+            fileDetailsLayout.visibility = View.VISIBLE
+            fileNameView.text = filename
+            fileSizeView.text = formatFileSize(size)
+        }
 
         closeButton.setOnClickListener {
             attachedUris.remove(uri)
@@ -711,33 +747,54 @@ class TaskDetailActivity : AppCompatActivity() {
         binding.attachmentPreviewLayout.addView(previewView)
     }
 
+    private fun formatFileSize(size: Long): String {
+        if (size <= 0) return "0 B"
+        val units = arrayOf("B", "KB", "MB", "GB", "TB")
+        val digitGroups = (Math.log10(size.toDouble()) / Math.log10(1024.0)).toInt()
+        return java.text.DecimalFormat("#,##0.#").format(size / Math.pow(1024.0, digitGroups.toDouble())) + " " + units[digitGroups]
+    }
+
     private fun uploadAttachmentsAndAddComment(commentText: String) {
-        val uploadedUrls = mutableListOf<String>()
+        val uploadedAttachments = mutableListOf<Attachment>()
         if (attachedUris.isEmpty()) {
-            addComment(commentText, uploadedUrls)
+            addComment(commentText, uploadedAttachments)
             return
         }
 
         // Show loading indicator if needed
         var uploadCount = 0
         attachedUris.forEach { uri ->
+            // Extract file metadata locally
+            var filename = "unknown_file"
+            var size = 0L
+            val type = contentResolver.getType(uri) ?: "application/octet-stream"
+
+            contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+                if (cursor.moveToFirst()) {
+                    if (nameIndex != -1) filename = cursor.getString(nameIndex)
+                    if (sizeIndex != -1) size = cursor.getLong(sizeIndex)
+                }
+            }
+
             firebaseHelper.uploadFile(this, uri, "comments", onSuccess = { url ->
-                uploadedUrls.add(url)
+                uploadedAttachments.add(Attachment(url, filename, size, type))
                 uploadCount++
                 if (uploadCount == attachedUris.size) {
-                    addComment(commentText, uploadedUrls)
+                    addComment(commentText, uploadedAttachments)
                 }
             }, onFailure = { e ->
                 Toast.makeText(this, "Failed to upload attachment: ${e.message}", Toast.LENGTH_SHORT).show()
                 uploadCount++ // Still proceed or handle error
                 if (uploadCount == attachedUris.size) {
-                     addComment(commentText, uploadedUrls) // Try adding comment with successful uploads
+                     addComment(commentText, uploadedAttachments) // Try adding comment with successful uploads
                 }
             })
         }
     }
 
-    private fun addComment(commentText: String, attachments: List<String>) {
+    private fun addComment(commentText: String, attachments: List<Attachment>) {
         val comment = Comment(
             taskId = taskId,
             userId = currentUserId,

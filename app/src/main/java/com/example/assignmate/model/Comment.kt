@@ -9,5 +9,5 @@ data class Comment(
     val username: String = "",
     val commentText: String = "",
     val timestamp: Long = 0,
-    val attachments: List<String> = emptyList() // List of URLs
+    val attachments: List<Attachment> = emptyList() 
 )

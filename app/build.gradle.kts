@@ -2,7 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     id("com.google.gms.google-services")
-
+    id("kotlin-parcelize")
 }
 
 android {
@@ -57,4 +57,7 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+
+    implementation("com.cloudinary:cloudinary-android:2.5.0")
+    implementation("com.github.chrisbanes:PhotoView:2.3.0")
 }

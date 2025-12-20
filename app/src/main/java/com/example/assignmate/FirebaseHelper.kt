@@ -3,6 +3,9 @@ package com.example.assignmate
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import com.cloudinary.android.MediaManager
+import com.cloudinary.android.callback.ErrorInfo
+import com.cloudinary.android.callback.UploadCallback
 import com.example.assignmate.model.Comment
 import com.example.assignmate.model.Group
 import com.example.assignmate.model.Label
@@ -462,11 +465,25 @@ class FirebaseHelper {
     }
 
     fun addComment(comment: Comment, onSuccess: (String) -> Unit, onFailure: (Exception) -> Unit) {
-        commentsCollection.add(comment)
-            .addOnSuccessListener { documentReference ->
-                onSuccess(documentReference.id)
+        // Fetch username first
+        getUserDetails(comment.userId,
+            onSuccess = { user ->
+                val commentWithUsername = comment.copy(username = user?.username ?: "Unknown User")
+                commentsCollection.add(commentWithUsername)
+                    .addOnSuccessListener { documentReference ->
+                        onSuccess(documentReference.id)
+                    }
+                    .addOnFailureListener { e -> onFailure(e) }
+            },
+            onFailure = {
+                // Fallback if username fetch fails
+                 commentsCollection.add(comment)
+                    .addOnSuccessListener { documentReference ->
+                        onSuccess(documentReference.id)
+                    }
+                    .addOnFailureListener { e -> onFailure(e) }
             }
-            .addOnFailureListener { e -> onFailure(e) }
+        )
     }
 
     fun deleteComments(commentIds: List<String>, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
@@ -606,30 +623,39 @@ class FirebaseHelper {
     }
 
     fun uploadFile(context: Context, uri: Uri, folderName: String, onSuccess: (String) -> Unit, onFailure: (Exception) -> Unit) {
-        val fileName = UUID.randomUUID().toString()
-        val storageRef = storage.reference.child("$folderName/$fileName")
+        val contentResolver = context.contentResolver
+        val mimeType = contentResolver.getType(uri)
+        
+        // Determine resource_type
+        // "auto" usually detects PDF as 'image' (for thumbnailing) or 'raw'.
+        // If Cloudinary fails with "Invalid PDF file", it often means it tried 'image' and failed.
+        // For non-image/non-video files (like PDF), forcing 'raw' bypasses the image validation.
+        
+        val isImage = mimeType?.startsWith("image/") == true
+        val isVideo = mimeType?.startsWith("video/") == true
+        
+        val resourceType = if (isImage) "image" else if (isVideo) "video" else "raw"
+        
+        MediaManager.get().upload(uri)
+            .unsigned("assignmate_preset")
+            .option("folder", folderName)
+            .option("resource_type", resourceType)
+            .callback(object : UploadCallback {
+                override fun onStart(requestId: String) {}
 
-        try {
-            val contentResolver = context.contentResolver
-            val inputStream = contentResolver.openInputStream(uri)
+                override fun onProgress(requestId: String, bytes: Long, totalBytes: Long) {}
 
-            if (inputStream != null) {
-                storageRef.putStream(inputStream)
-                    .addOnSuccessListener {
-                        storageRef.downloadUrl.addOnSuccessListener { uri ->
-                            onSuccess(uri.toString())
-                        }.addOnFailureListener { e ->
-                            onFailure(e)
-                        }
-                    }
-                    .addOnFailureListener { e ->
-                        onFailure(e)
-                    }
-            } else {
-                onFailure(Exception("Could not open input stream"))
-            }
-        } catch (e: Exception) {
-            onFailure(e)
-        }
+                override fun onSuccess(requestId: String, resultData: Map<*, *>) {
+                    val url = (resultData["secure_url"] ?: resultData["url"]) as String
+                    onSuccess(url)
+                }
+
+                override fun onError(requestId: String, errorInfo: ErrorInfo) {
+                    onFailure(Exception(errorInfo.description))
+                }
+
+                override fun onReschedule(requestId: String, errorInfo: ErrorInfo) {}
+            })
+            .dispatch()
     }
 }
