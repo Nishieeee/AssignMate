@@ -25,6 +25,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.util.Calendar
 import java.util.UUID
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -86,11 +87,22 @@ class FirebaseHelper {
             .addOnFailureListener { e -> onFailure(e) }
     }
 
+    fun updateUserProfile(userId: String, username: String, profileImage: String, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
+        val updates = mapOf(
+            "username" to username,
+            "profileImage" to profileImage
+        )
+        usersCollection.document(userId).update(updates)
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { e -> onFailure(e) }
+    }
+
     fun createGroup(
         groupName: String,
         groupDescription: String,
         leaderId: String,
         groupCode: String,
+        profileImage: String = "",
         onSuccess: (String) -> Unit,
         onFailure: (Exception) -> Unit
     ) {
@@ -101,7 +113,8 @@ class FirebaseHelper {
             leaderId = leaderId,
             code = groupCode,
             members = members,
-            lastUpdated = System.currentTimeMillis()
+            lastUpdated = System.currentTimeMillis(),
+            profileImage = profileImage
         )
 
         groupsCollection.add(group)
@@ -157,13 +170,15 @@ class FirebaseHelper {
         groupId: String,
         groupName: String,
         groupDescription: String,
+        profileImage: String,
         onSuccess: () -> Unit,
         onFailure: (Exception) -> Unit
     ) {
         val updates = mapOf(
             "name" to groupName,
             "description" to groupDescription,
-            "lastUpdated" to System.currentTimeMillis()
+            "lastUpdated" to System.currentTimeMillis(),
+            "profileImage" to profileImage
         )
         groupsCollection.document(groupId).update(updates)
             .addOnSuccessListener {
@@ -289,9 +304,9 @@ class FirebaseHelper {
                         }
                         val upcoming = tasks.filter { task ->
                             val currentTime = System.currentTimeMillis()
-                            val threeDaysInMillis = 3 * 24 * 60 * 60 * 1000
-                            val threeDaysFromNow = currentTime + threeDaysInMillis
-                            task.dueDate > currentTime && task.dueDate <= threeDaysFromNow && !task.status.equals("Complete", ignoreCase = true)
+                            val sevenDaysInMillis = 7L * 24 * 60 * 60 * 1000
+                            val sevenDaysFromNow = currentTime + sevenDaysInMillis
+                            task.dueDate > currentTime && task.dueDate <= sevenDaysFromNow && !task.status.equals("Complete", ignoreCase = true)
                         }
                         group to upcoming
                     }
@@ -319,14 +334,29 @@ class FirebaseHelper {
     }
 
     fun getUpcomingTasksForUser(userId: String, onSuccess: (List<Task>) -> Unit, onFailure: (Exception) -> Unit) {
+        val calendar = Calendar.getInstance()
+        calendar.set(Calendar.HOUR_OF_DAY, 0)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.set(Calendar.MILLISECOND, 0)
+        val todayMillis = calendar.timeInMillis
+
+        val endCalendar = calendar.clone() as Calendar
+        endCalendar.add(Calendar.DATE, 7)
+        endCalendar.set(Calendar.HOUR_OF_DAY, 23)
+        endCalendar.set(Calendar.MINUTE, 59)
+        endCalendar.set(Calendar.SECOND, 59)
+        endCalendar.set(Calendar.MILLISECOND, 999)
+        val endMillis = endCalendar.timeInMillis
+
+        // Fetch all tasks for the user and filter in memory to avoid missing index issues
         tasksCollection.whereArrayContains("assignedTo", userId)
             .get()
             .addOnSuccessListener { querySnapshot ->
-                val currentTime = System.currentTimeMillis()
-                val threeDaysInMillis = 3 * 24 * 60 * 60 * 1000
-                val threeDaysFromNow = currentTime + threeDaysInMillis
                 val upcomingTasks = querySnapshot.toObjects(Task::class.java).filter {
-                    it.dueDate > currentTime && it.dueDate <= threeDaysFromNow && !it.status.equals("Complete", ignoreCase = true)
+                    val isUpcoming = it.dueDate >= todayMillis && it.dueDate <= endMillis
+                    val isNotCompleted = !it.status.equals("Complete", ignoreCase = true) && !it.status.equals("Completed", ignoreCase = true)
+                    isUpcoming && isNotCompleted
                 }.sortedBy { it.dueDate }
                 onSuccess(upcomingTasks)
             }

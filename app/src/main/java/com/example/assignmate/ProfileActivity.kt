@@ -8,6 +8,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import com.bumptech.glide.Glide
 import com.example.assignmate.databinding.ActivityProfileBinding
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.firebase.auth.FirebaseAuth
@@ -73,6 +74,14 @@ class ProfileActivity : AppCompatActivity(), BottomNavigationView.OnNavigationIt
                 if (user != null) {
                     binding.profileName.text = user.username
                     binding.profileEmail.text = user.email
+                    if (user.profileImage.isNotEmpty()) {
+                        binding.profileImage.imageTintList = null
+                        Glide.with(this).load(user.profileImage).into(binding.profileImage)
+                    } else {
+                        binding.profileImage.setImageResource(R.drawable.ic_profile_user)
+                        // Re-apply tint if necessary for default image, assuming #AAA39A as per xml
+                         binding.profileImage.setColorFilter(android.graphics.Color.parseColor("#AAA39A"))
+                    }
                 }
             }, {
                 Toast.makeText(this, "Failed to load profile", Toast.LENGTH_SHORT).show()
@@ -140,5 +149,6 @@ class ProfileActivity : AppCompatActivity(), BottomNavigationView.OnNavigationIt
     override fun onResume() {
         super.onResume()
         updateNotificationBadge()
+        loadUserProfile()
     }
 }

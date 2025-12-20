@@ -6,6 +6,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.assignmate.databinding.ItemUpcomingTaskBinding
 import com.example.assignmate.model.Group
 import com.example.assignmate.model.Task
+import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
 class UpcomingTasksAdapter(
@@ -41,7 +42,14 @@ class UpcomingTasksAdapter(
 
             val diff = task.dueDate - System.currentTimeMillis()
             val days = TimeUnit.MILLISECONDS.toDays(diff)
+
+            val calendar = Calendar.getInstance()
+            val today = calendar.get(Calendar.DAY_OF_YEAR)
+            calendar.timeInMillis = task.dueDate
+            val dueDateDay = calendar.get(Calendar.DAY_OF_YEAR)
+
             binding.dueDate.text = when {
+                today == dueDateDay -> "Due today"
                 days > 1 -> "$days days left"
                 days == 1L -> "1 day left"
                 else -> "Due today"

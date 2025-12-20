@@ -13,5 +13,6 @@ data class Group(
     val favouriteBy: List<String> = emptyList(),
     val progress: Int = 0,
     val assignedTasksCount: Int = 0,
-    val pendingTaskCount: Int = 0
+    val pendingTaskCount: Int = 0,
+    val profileImage: String = ""
 )

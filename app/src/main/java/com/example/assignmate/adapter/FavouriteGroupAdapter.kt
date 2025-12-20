@@ -3,6 +3,8 @@ package com.example.assignmate.adapter
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
+import com.example.assignmate.R
 import com.example.assignmate.databinding.ItemFavouriteGroupBinding
 import com.example.assignmate.model.Group
 
@@ -32,6 +34,16 @@ class FavouriteGroupAdapter(
         fun bind(group: Group) {
             binding.groupName.text = group.name
             binding.groupProgress.progress = group.progress
+            if (group.profileImage.isNotEmpty()) {
+                Glide.with(binding.root.context)
+                    .load(group.profileImage)
+                    .placeholder(R.drawable.scrim)
+                    .error(R.drawable.scrim)
+                    .centerCrop()
+                    .into(binding.groupImage)
+            } else {
+                binding.groupImage.setImageResource(R.drawable.scrim)
+            }
             binding.root.setOnClickListener {
                 onGroupClicked(group)
             }

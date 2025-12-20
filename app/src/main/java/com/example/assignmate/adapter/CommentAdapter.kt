@@ -62,11 +62,22 @@ class CommentAdapter(
         private val timestamp: TextView = itemView.findViewById(R.id.comment_timestamp)
         private val attachmentsLayout: LinearLayout = itemView.findViewById(R.id.comment_attachments_layout)
         private val deleteCheckbox: CheckBox = itemView.findViewById(R.id.delete_checkbox)
+        private val profileImage: ImageView = itemView.findViewById(R.id.comment_profile_image)
 
         fun bind(comment: Comment) {
             username.text = comment.username
             commentText.text = comment.commentText
             timestamp.text = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date(comment.timestamp))
+
+            if (comment.userProfileImage.isNotEmpty()) {
+                Glide.with(itemView.context)
+                    .load(comment.userProfileImage)
+                    .placeholder(R.drawable.ic_profile_user)
+                    .error(R.drawable.ic_profile_user)
+                    .into(profileImage)
+            } else {
+                profileImage.setImageResource(R.drawable.ic_profile_user)
+            }
 
             deleteCheckbox.visibility = if (isDeleteMode) View.VISIBLE else View.GONE
             // Avoid triggering listener during bind

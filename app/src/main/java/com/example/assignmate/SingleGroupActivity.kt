@@ -4,8 +4,11 @@ import android.app.DatePickerDialog
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.graphics.Color
+import android.net.Uri
 import android.os.Bundle
+import android.provider.MediaStore
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.Menu
@@ -13,8 +16,11 @@ import android.view.MenuItem
 import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.EditText
+import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
@@ -22,6 +28,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.adapter.FragmentStateAdapter
+import com.bumptech.glide.Glide
 import com.example.assignmate.adapter.LabelAdapter
 import com.example.assignmate.adapter.SelectableLabelAdapter
 import com.example.assignmate.adapter.SubtaskAdapter
@@ -48,6 +55,25 @@ class SingleGroupActivity : AppCompatActivity() {
     private var allTasks = listOf<Task>()
     private var currentFilterStatus = "All"
     private var currentSearchQuery = ""
+    
+    private var selectedImageUri: Uri? = null
+    private var currentGroupImagePreview: ImageView? = null
+    private var currentRemoveImageButton: ImageButton? = null
+    private var currentUploadImageButton: TextView? = null
+
+    private val pickImageLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == RESULT_OK) {
+            val uri = result.data?.data
+            if (uri != null) {
+                selectedImageUri = uri
+                currentGroupImagePreview?.let {
+                    Glide.with(this).load(uri).into(it)
+                }
+                currentRemoveImageButton?.visibility = View.VISIBLE
+                currentUploadImageButton?.text = "Change Group Photo"
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -184,6 +210,18 @@ class SingleGroupActivity : AppCompatActivity() {
         val groupNameInput = view.findViewById<EditText>(R.id.group_name_input)
         val groupDescriptionInput = view.findViewById<EditText>(R.id.group_description_input)
         val groupCodeText = view.findViewById<TextView>(R.id.group_code_text)
+        val copyCodeButton = view.findViewById<ImageButton>(R.id.copy_code_button)
+        val joinGroupInsteadButton = view.findViewById<TextView>(R.id.join_group_instead_button)
+        val uploadImageButton = view.findViewById<TextView>(R.id.upload_image_button)
+        val groupImagePreview = view.findViewById<ImageView>(R.id.group_image_preview)
+        val removeImageButton = view.findViewById<ImageButton>(R.id.remove_image_button)
+        
+        currentGroupImagePreview = groupImagePreview
+        currentRemoveImageButton = removeImageButton
+        currentUploadImageButton = uploadImageButton
+        selectedImageUri = null
+        
+        joinGroupInsteadButton.visibility = View.GONE
 
         firebaseHelper.getGroup(groupId,
             onSuccess = {
@@ -191,30 +229,91 @@ class SingleGroupActivity : AppCompatActivity() {
                     groupNameInput.setText(it.name)
                     groupDescriptionInput.setText(it.description)
                     groupCodeText.text = "Group Code: ${it.code}"
+                    copyCodeButton.visibility = View.VISIBLE
+                    
+                    if (it.profileImage.isNotEmpty()) {
+                        Glide.with(this).load(it.profileImage).into(groupImagePreview)
+                        removeImageButton.visibility = View.VISIBLE
+                        uploadImageButton.text = "Change Group Photo"
+                    } else {
+                        removeImageButton.visibility = View.GONE
+                        uploadImageButton.text = "Upload Image Photo"
+                    }
                 }
             },
             onFailure = {}
         )
-
-        builder.setPositiveButton("Save") { dialog, _ ->
-            val newGroupName = groupNameInput.text.toString()
-            val newGroupDescription = groupDescriptionInput.text.toString()
-            if (newGroupName.isNotEmpty()) {
-                firebaseHelper.updateGroup(groupId, newGroupName, newGroupDescription,
-                    onSuccess = {
-                        Toast.makeText(this, "Group updated successfully", Toast.LENGTH_SHORT).show()
-                        supportActionBar?.title = newGroupName
-                    },
-                    onFailure = {
-                        Toast.makeText(this, "Failed to update group", Toast.LENGTH_SHORT).show()
-                    }
-                )
-            }
-            dialog.dismiss()
+        
+        uploadImageButton.setOnClickListener {
+            val intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+            pickImageLauncher.launch(intent)
         }
+        
+        groupImagePreview.setOnClickListener {
+             val intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+             pickImageLauncher.launch(intent)
+        }
+        
+        removeImageButton.setOnClickListener {
+            selectedImageUri = null
+            groupImagePreview.setImageResource(R.drawable.ic_group)
+            removeImageButton.visibility = View.GONE
+            uploadImageButton.text = "Upload Image Photo"
+            groupImagePreview.tag = "removed"
+        }
+
+        builder.setPositiveButton("Save", null)
         builder.setNegativeButton("Cancel") { dialog, _ -> dialog.cancel() }
 
-        builder.show()
+        val dialog = builder.create()
+        dialog.show()
+        
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            val newGroupName = groupNameInput.text.toString()
+            val newGroupDescription = groupDescriptionInput.text.toString()
+            
+            if (newGroupName.isNotEmpty()) {
+                val isImageRemoved = groupImagePreview.tag == "removed"
+                
+                firebaseHelper.getGroup(groupId, onSuccess = { group ->
+                    if (group != null) {
+                        if (selectedImageUri != null) {
+                            firebaseHelper.uploadFile(this, selectedImageUri!!, "group_images",
+                                onSuccess = { imageUrl ->
+                                    updateGroup(groupId, newGroupName, newGroupDescription, imageUrl)
+                                    dialog.dismiss()
+                                },
+                                onFailure = {
+                                    Toast.makeText(this, "Failed to upload image", Toast.LENGTH_SHORT).show()
+                                }
+                            )
+                        } else if (isImageRemoved) {
+                            updateGroup(groupId, newGroupName, newGroupDescription, "")
+                            dialog.dismiss()
+                        } else {
+                            updateGroup(groupId, newGroupName, newGroupDescription, group.profileImage)
+                            dialog.dismiss()
+                        }
+                    }
+                }, onFailure = {
+                     Toast.makeText(this, "Failed to fetch group info", Toast.LENGTH_SHORT).show()
+                })
+            } else {
+                 Toast.makeText(this, "Group name cannot be empty", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+    
+    private fun updateGroup(id: String, name: String, description: String, imageUrl: String) {
+        firebaseHelper.updateGroup(id, name, description, imageUrl,
+            onSuccess = {
+                Toast.makeText(this, "Group updated successfully", Toast.LENGTH_SHORT).show()
+                supportActionBar?.title = name
+            },
+            onFailure = {
+                Toast.makeText(this, "Failed to update group", Toast.LENGTH_SHORT).show()
+            }
+        )
     }
 
     private fun showDeleteGroupDialog() {

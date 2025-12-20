@@ -4,6 +4,7 @@ import android.view.LayoutInflater
 import android.view.ViewGroup
 import android.widget.PopupMenu
 import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
 import com.example.assignmate.R
 import com.example.assignmate.databinding.ItemGroupCardBinding
 import com.example.assignmate.model.Group
@@ -61,6 +62,17 @@ class GroupAdapter(
             binding.groupDescription.text = group.description
             binding.lastUpdated.text = "Last updated: ${SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(group.lastUpdated))}"
             binding.groupProgress.progress = group.progress
+            
+            if (group.profileImage.isNotEmpty()) {
+                Glide.with(binding.root.context)
+                    .load(group.profileImage)
+                    .placeholder(R.drawable.scrim)
+                    .error(R.drawable.scrim)
+                    .centerCrop()
+                    .into(binding.groupImage)
+            } else {
+                binding.groupImage.setImageResource(R.drawable.scrim)
+            }
 
             binding.root.setOnClickListener {
                 onGroupClicked(group)

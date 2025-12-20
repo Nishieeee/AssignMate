@@ -4,17 +4,21 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
 import android.widget.EditText
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.bumptech.glide.Glide
 import com.example.assignmate.adapter.FavouriteGroupAdapter
 import com.example.assignmate.adapter.UpcomingTasksAdapter
 import com.example.assignmate.databinding.ActivityMainBinding
@@ -26,6 +30,21 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var firebaseHelper: FirebaseHelper
     private var currentUserId: String = ""
+    private var selectedImageUri: Uri? = null
+    private var currentGroupImagePreview: ImageView? = null
+    private var currentRemoveImageButton: ImageButton? = null
+    private var currentUploadImageButton: TextView? = null
+
+    private val pickImageLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        if (uri != null) {
+            selectedImageUri = uri
+            currentGroupImagePreview?.let {
+                Glide.with(this).load(uri).into(it)
+            }
+            currentRemoveImageButton?.visibility = View.VISIBLE
+            currentUploadImageButton?.text = "Change Group Photo"
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -226,6 +245,29 @@ class MainActivity : AppCompatActivity() {
         val groupCodeText = view.findViewById<TextView>(R.id.group_code_text)
         val copyCodeButton = view.findViewById<ImageButton>(R.id.copy_code_button)
         val joinGroupInsteadButton = view.findViewById<TextView>(R.id.join_group_instead_button)
+        val uploadImageButton = view.findViewById<TextView>(R.id.upload_image_button)
+        val groupImagePreview = view.findViewById<ImageView>(R.id.group_image_preview)
+        val removeImageButton = view.findViewById<ImageButton>(R.id.remove_image_button)
+
+        currentGroupImagePreview = groupImagePreview
+        currentRemoveImageButton = removeImageButton
+        currentUploadImageButton = uploadImageButton
+        selectedImageUri = null
+
+        uploadImageButton.setOnClickListener {
+            pickImageLauncher.launch("image/*")
+        }
+
+        groupImagePreview.setOnClickListener {
+             pickImageLauncher.launch("image/*")
+        }
+
+        removeImageButton.setOnClickListener {
+            selectedImageUri = null
+            groupImagePreview.setImageResource(R.drawable.ic_group)
+            removeImageButton.visibility = View.GONE
+            uploadImageButton.text = "Upload Image Photo"
+        }
 
         val dialog = builder.create()
 
@@ -255,26 +297,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         dialog.setButton(AlertDialog.BUTTON_POSITIVE, "Create") { _, _ ->
-            val groupName = groupNameInput.text.toString()
-            val groupDescription = groupDescriptionInput.text.toString()
-            val groupCode = groupCodeText.text.toString().substringAfter("Group Code: ")
-
-            if (groupName.isNotEmpty() && groupCode.length == 6) {
-                firebaseHelper.createGroup(groupName, groupDescription, currentUserId, groupCode,
-                    onSuccess = {
-                        Toast.makeText(this, "Group created successfully", Toast.LENGTH_SHORT).show()
-                        val intent = Intent(this, SingleGroupActivity::class.java)
-                        intent.putExtra("GROUP_ID", it)
-                        intent.putExtra("USER_ID", currentUserId)
-                        startActivity(intent)
-                    },
-                    onFailure = {
-                        Toast.makeText(this, "Failed to create group. The code might already exist.", Toast.LENGTH_SHORT).show()
-                    }
-                )
-            } else {
-                Toast.makeText(this, "Please enter a group name", Toast.LENGTH_SHORT).show()
-            }
+             // Prevent auto-dismiss
         }
 
         dialog.setButton(AlertDialog.BUTTON_NEGATIVE, "Cancel") { _, _ -> dialog.dismiss() }
@@ -285,6 +308,46 @@ class MainActivity : AppCompatActivity() {
         }
 
         dialog.show()
+
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            val groupName = groupNameInput.text.toString()
+            val groupDescription = groupDescriptionInput.text.toString()
+            val groupCode = groupCodeText.text.toString().substringAfter("Group Code: ")
+
+            if (groupName.isNotEmpty() && groupCode.length == 6) {
+                if (selectedImageUri != null) {
+                    firebaseHelper.uploadFile(this, selectedImageUri!!, "group_images",
+                        onSuccess = { imageUrl ->
+                            createGroup(groupName, groupDescription, groupCode, imageUrl)
+                            dialog.dismiss()
+                        },
+                        onFailure = {
+                            Toast.makeText(this, "Failed to upload image", Toast.LENGTH_SHORT).show()
+                        }
+                    )
+                } else {
+                    createGroup(groupName, groupDescription, groupCode, "")
+                    dialog.dismiss()
+                }
+            } else {
+                Toast.makeText(this, "Please enter a group name", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun createGroup(name: String, description: String, code: String, imageUrl: String) {
+        firebaseHelper.createGroup(name, description, currentUserId, code, imageUrl,
+            onSuccess = {
+                Toast.makeText(this, "Group created successfully", Toast.LENGTH_SHORT).show()
+                val intent = Intent(this, SingleGroupActivity::class.java)
+                intent.putExtra("GROUP_ID", it)
+                intent.putExtra("USER_ID", currentUserId)
+                startActivity(intent)
+            },
+            onFailure = {
+                Toast.makeText(this, "Failed to create group. The code might already exist.", Toast.LENGTH_SHORT).show()
+            }
+        )
     }
 
     private fun showJoinGroupDialog() {

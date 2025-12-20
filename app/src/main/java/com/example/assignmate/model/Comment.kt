@@ -7,6 +7,7 @@ data class Comment(
     val taskId: String = "",
     val userId: String = "",
     val username: String = "",
+    val userProfileImage: String = "",
     val commentText: String = "",
     val timestamp: Long = 0,
     val attachments: List<Attachment> = emptyList() 

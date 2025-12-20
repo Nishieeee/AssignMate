@@ -20,38 +20,46 @@
             android:layout_height="120dp"
             android:scaleType="centerCrop"
             app:layout_constraintTop_toTopOf="parent"
-            tools:src="@drawable/card_background_1" />
-
-        <View
-            android:id="@+id/group_photo"
-            android:layout_width="match_parent"
-            android:layout_height="120dp"
-            android:background="@drawable/scrim"
-            app:layout_constraintTop_toTopOf="parent" />
+            tools:src="@drawable/scrim" />
 
         <TextView
             android:id="@+id/group_name"
-            android.textColor="@android:color/white"
-            android:layout_width="0dp"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="16dp"
             android:layout_marginEnd="8dp"
             android:layout_marginBottom="8dp"
+            android:background="@drawable/rounded_text_background"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
             android:textAppearance="?attr/textAppearanceHeadline6"
+            android:textColor="@android:color/black"
+            app:layout_constrainedWidth="true"
             app:layout_constraintBottom_toTopOf="@+id/group_leader"
             app:layout_constraintEnd_toStartOf="@+id/group_overflow_menu"
+            app:layout_constraintHorizontal_bias="0.0"
             app:layout_constraintStart_toStartOf="parent"
             tools:text="Mobile App Development" />
 
         <TextView
             android:id="@+id/group_leader"
-            android.textColor="@android:color/white"
-            android:layout_width="0dp"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
+            android:background="@drawable/rounded_text_background"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
             android:textAppearance="?attr/textAppearanceBody2"
+            android:textColor="@android:color/black"
+            app:layout_constrainedWidth="true"
             app:layout_constraintBottom_toBottomOf="@+id/group_image"
             app:layout_constraintStart_toStartOf="@+id/group_name"
+            app:layout_constraintEnd_toStartOf="@+id/group_overflow_menu"
+            app:layout_constraintHorizontal_bias="0.0"
             tools:text="Group Leader: John Doe" />
 
         <ImageView

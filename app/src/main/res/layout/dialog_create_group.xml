@@ -7,6 +7,49 @@
     android:orientation="vertical"
     android:padding="24dp">
 
+    <FrameLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="8dp">
+
+        <de.hdodenhof.circleimageview.CircleImageView
+            android:id="@+id/group_image_preview"
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:src="@drawable/ic_group"
+            app:civ_border_color="#F28A30"
+            app:civ_border_width="2dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackgroundBorderless"/>
+
+        <ImageButton
+            android:id="@+id/remove_image_button"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_gravity="top|end"
+            android:background="@drawable/circular_background"
+            android:src="@drawable/ic_close"
+            app:tint="#FFFFFF"
+            android:visibility="gone"
+            android:clickable="true"
+            android:focusable="true"/>
+
+    </FrameLayout>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/upload_image_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:text="Upload Image Photo"
+        android:textColor="#F28A30"
+        android:textStyle="bold"
+        android:layout_marginBottom="16dp"
+        style="@style/Widget.MaterialComponents.Button.TextButton"
+        app:rippleColor="#F28A30"/>
+
     <com.google.android.material.textfield.TextInputLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

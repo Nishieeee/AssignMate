@@ -184,8 +184,16 @@ class TaskActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItemS
             listItems.addAll(todayTasks.sortedBy { it.dueDate }.map { GroupedTaskAdapter.TaskListItem.TaskItem(it) })
         }
         if (upcomingTasks.isNotEmpty()) {
-            listItems.add(GroupedTaskAdapter.TaskListItem.Header("Upcoming"))
-            listItems.addAll(upcomingTasks.sortedBy { it.dueDate }.map { GroupedTaskAdapter.TaskListItem.TaskItem(it) })
+            val sortedUpcoming = upcomingTasks.sortedBy { it.dueDate }
+            val dateFormat = java.text.SimpleDateFormat("MM/dd/yyyy", java.util.Locale.getDefault())
+            val groupedByDate = sortedUpcoming.groupBy {
+                dateFormat.format(java.util.Date(it.dueDate))
+            }
+
+            groupedByDate.forEach { (dateString, tasksForDate) ->
+                listItems.add(GroupedTaskAdapter.TaskListItem.Header(dateString))
+                listItems.addAll(tasksForDate.map { GroupedTaskAdapter.TaskListItem.TaskItem(it) })
+            }
         }
         if (noDateTasks.isNotEmpty()) {
             listItems.add(GroupedTaskAdapter.TaskListItem.Header("No Date"))

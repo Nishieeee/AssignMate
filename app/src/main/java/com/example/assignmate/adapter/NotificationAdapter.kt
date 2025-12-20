@@ -58,18 +58,18 @@ class NotificationAdapter(
             binding.notificationTimestamp.text = SimpleDateFormat("hh:mm a, dd/MM/yy", Locale.getDefault()).format(Date(notification.timestamp))
 
             if (notification.isRead) {
-                // READ: Dark text on a light background
-                binding.notificationContainer.setBackgroundColor(Color.WHITE)
+                // READ: Dark text on a light F8F0 background
+                binding.notificationContainer.setBackgroundColor(Color.parseColor("#FFF8F0"))
                 binding.notificationTitle.setTextColor(Color.BLACK)
                 binding.notificationMessage.setTextColor(Color.DKGRAY)
                 binding.notificationTimestamp.setTextColor(Color.GRAY)
                 binding.markReadButton.visibility = View.GONE
             } else {
-                // UNREAD: White text on a dark background for high contrast
-                binding.notificationContainer.setBackgroundColor(Color.parseColor("#FF373737")) // A dark gray
-                binding.notificationTitle.setTextColor(Color.WHITE)
-                binding.notificationMessage.setTextColor(Color.WHITE)
-                binding.notificationTimestamp.setTextColor(Color.LTGRAY)
+                // UNREAD: Dark text on a white background
+                binding.notificationContainer.setBackgroundColor(Color.WHITE)
+                binding.notificationTitle.setTextColor(Color.BLACK)
+                binding.notificationMessage.setTextColor(Color.DKGRAY)
+                binding.notificationTimestamp.setTextColor(Color.GRAY)
                 binding.markReadButton.visibility = View.VISIBLE
             }
 

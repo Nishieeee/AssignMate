@@ -626,14 +626,33 @@ class TaskDetailActivity : AppCompatActivity() {
     private fun loadComments() {
         firebaseHelper.getCommentsForTask(taskId,
             onSuccess = { comments ->
-                // Sort comments so latest are at the bottom? Or top? 
-                // Typically messaging apps show latest at bottom, but simple lists show at top.
-                // Keeping original order or sorting by timestamp if needed.
-                val sortedComments = comments.sortedBy { it.timestamp }
-                
-                binding.commentsRecyclerView.layoutManager = LinearLayoutManager(this)
-                commentAdapter = CommentAdapter(sortedComments, isDeleteMode = isCommentDeleteMode)
-                binding.commentsRecyclerView.adapter = commentAdapter
+                val userIds = comments.map { it.userId }.distinct()
+                firebaseHelper.getUsers(userIds,
+                    onSuccess = { users ->
+                        val userMap = users.associateBy { it.id }
+                        val commentsWithProfileImages = comments.map { comment ->
+                            val user = userMap[comment.userId]
+                            if (user != null) {
+                                comment.copy(userProfileImage = user.profileImage)
+                            } else {
+                                comment
+                            }
+                        }
+                        
+                        val sortedComments = commentsWithProfileImages.sortedBy { it.timestamp }
+                        
+                        binding.commentsRecyclerView.layoutManager = LinearLayoutManager(this)
+                        commentAdapter = CommentAdapter(sortedComments, isDeleteMode = isCommentDeleteMode)
+                        binding.commentsRecyclerView.adapter = commentAdapter
+                    },
+                    onFailure = {
+                        // Fallback to original comments if user fetch fails
+                        val sortedComments = comments.sortedBy { it.timestamp }
+                        binding.commentsRecyclerView.layoutManager = LinearLayoutManager(this)
+                        commentAdapter = CommentAdapter(sortedComments, isDeleteMode = isCommentDeleteMode)
+                        binding.commentsRecyclerView.adapter = commentAdapter
+                    }
+                )
             },
             onFailure = {}
         )
@@ -795,29 +814,54 @@ class TaskDetailActivity : AppCompatActivity() {
     }
 
     private fun addComment(commentText: String, attachments: List<Attachment>) {
-        val comment = Comment(
-            taskId = taskId,
-            userId = currentUserId,
-            commentText = commentText,
-            timestamp = System.currentTimeMillis(),
-            attachments = attachments
-        )
-        firebaseHelper.addComment(comment,
-            onSuccess = {
-                loadComments()
-                binding.commentInput.text?.clear()
-                attachedUris.clear()
-                binding.attachmentPreviewLayout.removeAllViews()
-                val notificationMessage = "New comment on task: ${originalTask?.name}"
-                originalTask?.assignedTo?.forEach { userId ->
-                    if (userId != currentUserId) {
-                        notificationHelper.sendNotification(Notification(userId = userId, message = notificationMessage, taskId = taskId), userId.hashCode())
+        // Need to fetch user details to get profile image URL first
+        firebaseHelper.getUserDetails(currentUserId, onSuccess = { user ->
+            val profileImage = user?.profileImage ?: ""
+             val comment = Comment(
+                taskId = taskId,
+                userId = currentUserId,
+                commentText = commentText,
+                timestamp = System.currentTimeMillis(),
+                attachments = attachments,
+                userProfileImage = profileImage
+            )
+            firebaseHelper.addComment(comment,
+                onSuccess = {
+                    loadComments()
+                    binding.commentInput.text?.clear()
+                    attachedUris.clear()
+                    binding.attachmentPreviewLayout.removeAllViews()
+                    val notificationMessage = "New comment on task: ${originalTask?.name}"
+                    originalTask?.assignedTo?.forEach { userId ->
+                        if (userId != currentUserId) {
+                            notificationHelper.sendNotification(Notification(userId = userId, message = notificationMessage, taskId = taskId), userId.hashCode())
+                        }
                     }
+                },
+                onFailure = {
+                    Toast.makeText(this, "Failed to add comment", Toast.LENGTH_SHORT).show()
                 }
-            },
-            onFailure = {
-                Toast.makeText(this, "Failed to add comment", Toast.LENGTH_SHORT).show()
-            }
-        )
+            )
+        }, onFailure = {
+            // Fallback if user details fail
+             val comment = Comment(
+                taskId = taskId,
+                userId = currentUserId,
+                commentText = commentText,
+                timestamp = System.currentTimeMillis(),
+                attachments = attachments
+            )
+            firebaseHelper.addComment(comment,
+                onSuccess = {
+                    loadComments()
+                    binding.commentInput.text?.clear()
+                    attachedUris.clear()
+                    binding.attachmentPreviewLayout.removeAllViews()
+                },
+                onFailure = {
+                    Toast.makeText(this, "Failed to add comment", Toast.LENGTH_SHORT).show()
+                }
+            )
+        })
     }
 }
