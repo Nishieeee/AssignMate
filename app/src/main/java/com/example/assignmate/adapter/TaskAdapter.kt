@@ -16,6 +16,7 @@ import com.example.assignmate.model.Task
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Locale
 
 class TaskAdapter(
@@ -65,7 +66,15 @@ class TaskAdapter(
             if (task.dueDate != 0L) {
                 dueDate.visibility = View.VISIBLE
                 dueDate.text = "Due: ${SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(task.dueDate)}"
-                if (task.dueDate < System.currentTimeMillis() && task.status != "Complete") {
+
+                val calendar = Calendar.getInstance()
+                calendar.set(Calendar.HOUR_OF_DAY, 0)
+                calendar.set(Calendar.MINUTE, 0)
+                calendar.set(Calendar.SECOND, 0)
+                calendar.set(Calendar.MILLISECOND, 0)
+                val todayStart = calendar.timeInMillis
+
+                if (task.dueDate < todayStart && task.status != "Complete") {
                     overdueIndicator.visibility = View.VISIBLE
                 } else {
                     overdueIndicator.visibility = View.GONE

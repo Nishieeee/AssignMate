@@ -19,6 +19,7 @@ import com.example.assignmate.adapter.FavouriteGroupAdapter
 import com.example.assignmate.adapter.UpcomingTasksAdapter
 import com.example.assignmate.databinding.ActivityMainBinding
 import com.example.assignmate.model.Group
+import com.example.assignmate.model.Task
 
 class MainActivity : AppCompatActivity() {
 
@@ -109,22 +110,51 @@ class MainActivity : AppCompatActivity() {
         )
 
         firebaseHelper.getGroupsForUser(currentUserId,
-            onSuccess = { 
-                binding.totalGroups.text = it.size.toString()
-                val favouriteGroups = it.filter { group -> group.favouriteBy.contains(currentUserId) }
+            onSuccess = { groups ->
+                binding.totalGroups.text = groups.size.toString()
+                val favouriteGroups = groups.filter { group -> group.favouriteBy.contains(currentUserId) }
                 if (favouriteGroups.isEmpty()) {
                     binding.favouriteGroupsRecyclerView.visibility = View.GONE
                     binding.noFavouriteGroupText.visibility = View.VISIBLE
                 } else {
-                    binding.favouriteGroupsRecyclerView.visibility = View.VISIBLE
-                    binding.noFavouriteGroupText.visibility = View.GONE
-                    binding.favouriteGroupsRecyclerView.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
-                    binding.favouriteGroupsRecyclerView.adapter = FavouriteGroupAdapter(favouriteGroups, { group ->
-                        val intent = Intent(this, SingleGroupActivity::class.java)
-                        intent.putExtra("GROUP_ID", group.id)
-                        intent.putExtra("USER_ID", currentUserId)
-                        startActivity(intent)
-                    })
+                    val updatedFavouriteGroups = mutableListOf<Group>()
+                    var processedCount = 0
+
+                    for (group in favouriteGroups) {
+                        firebaseHelper.getTasksForGroup(group.id, { tasks ->
+                            val progress = calculateProgress(tasks)
+                            updatedFavouriteGroups.add(group.copy(progress = progress))
+                            processedCount++
+
+                            if (processedCount == favouriteGroups.size) {
+                                updatedFavouriteGroups.sortBy { it.name }
+                                binding.favouriteGroupsRecyclerView.visibility = View.VISIBLE
+                                binding.noFavouriteGroupText.visibility = View.GONE
+                                binding.favouriteGroupsRecyclerView.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+                                binding.favouriteGroupsRecyclerView.adapter = FavouriteGroupAdapter(updatedFavouriteGroups) { group ->
+                                    val intent = Intent(this, SingleGroupActivity::class.java)
+                                    intent.putExtra("GROUP_ID", group.id)
+                                    intent.putExtra("USER_ID", currentUserId)
+                                    startActivity(intent)
+                                }
+                            }
+                        }, {
+                            updatedFavouriteGroups.add(group)
+                            processedCount++
+                            if (processedCount == favouriteGroups.size) {
+                                updatedFavouriteGroups.sortBy { it.name }
+                                binding.favouriteGroupsRecyclerView.visibility = View.VISIBLE
+                                binding.noFavouriteGroupText.visibility = View.GONE
+                                binding.favouriteGroupsRecyclerView.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+                                binding.favouriteGroupsRecyclerView.adapter = FavouriteGroupAdapter(updatedFavouriteGroups) { group ->
+                                    val intent = Intent(this, SingleGroupActivity::class.java)
+                                    intent.putExtra("GROUP_ID", group.id)
+                                    intent.putExtra("USER_ID", currentUserId)
+                                    startActivity(intent)
+                                }
+                            }
+                        })
+                    }
                 }
             },
             onFailure = { binding.totalGroups.text = "0" }
@@ -171,6 +201,19 @@ class MainActivity : AppCompatActivity() {
                 binding.noUpcomingDeadlinesText.visibility = View.VISIBLE
             }
         )
+    }
+
+    private fun calculateProgress(tasks: List<Task>): Int {
+        if (tasks.isEmpty()) return 0
+        var totalProgress = 0.0
+        for (task in tasks) {
+            totalProgress += when (task.status) {
+                "Complete" -> 100
+                "In progress" -> 50
+                else -> 0
+            }
+        }
+        return (totalProgress / tasks.size).toInt()
     }
 
     private fun showCreateGroupDialog() {

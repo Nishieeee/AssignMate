@@ -6,21 +6,27 @@ import android.content.DialogInterface
 import android.content.Intent
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.net.Uri
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
 import android.util.Log
+import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.EditText
+import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
 import com.example.assignmate.adapter.CommentAdapter
 import com.example.assignmate.adapter.SelectableLabelAdapter
 import com.example.assignmate.adapter.SubtaskAdapter
@@ -51,6 +57,29 @@ class TaskDetailActivity : AppCompatActivity() {
     private lateinit var subtaskAdapter: SubtaskAdapter
     private var hasUnsavedChanges = false
     private var taskUpdated = false
+
+    private val attachedUris = mutableListOf<Uri>()
+
+    // For deleting comments
+    private var isCommentDeleteMode = false
+    private var commentAdapter: CommentAdapter? = null
+
+
+    private val attachFileLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            result.data?.data?.let { uri ->
+                addAttachmentPreview(uri)
+            }
+        }
+    }
+
+    private val attachImageLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            result.data?.data?.let { uri ->
+                addAttachmentPreview(uri)
+            }
+        }
+    }
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -108,7 +137,7 @@ class TaskDetailActivity : AppCompatActivity() {
     private fun updateUI() {
         binding.taskTitleInput.setText(originalTask?.name)
         binding.taskDescriptionInput.setText(originalTask?.description)
-        binding.groupName.text = originalTask?.groupName
+        supportActionBar?.title = originalTask?.groupName
 
         // Setup Status Dropdown
         val statusOptions = arrayOf("Not Started", "In progress", "Complete")
@@ -238,32 +267,101 @@ class TaskDetailActivity : AppCompatActivity() {
             showAddSubtaskDialog()
         }
 
+        binding.btnAttachFile.setOnClickListener {
+            val intent = Intent(Intent.ACTION_GET_CONTENT)
+            intent.type = "*/*"
+            attachFileLauncher.launch(intent)
+        }
+
+        binding.btnAttachImage.setOnClickListener {
+            val intent = Intent(Intent.ACTION_GET_CONTENT)
+            intent.type = "image/*"
+            attachImageLauncher.launch(intent)
+        }
+
         binding.addCommentButton.setOnClickListener {
+            if (currentUserId.isEmpty()) {
+                Toast.makeText(this, "Error: You are not logged in.", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
             val commentText = binding.commentInput.text.toString()
-            if (commentText.isNotEmpty()) {
-                val comment = Comment(
-                    taskId = taskId,
-                    userId = currentUserId,
-                    commentText = commentText,
-                    timestamp = System.currentTimeMillis()
-                )
-                firebaseHelper.addComment(comment,
-                    onSuccess = { 
-                        loadComments()
-                        binding.commentInput.text?.clear()
-                        val notificationMessage = "New comment on task: ${originalTask?.name}"
-                        originalTask?.assignedTo?.forEach { userId ->
-                            if (userId != currentUserId) { // Don't notify the user who commented
-                                notificationHelper.sendNotification(Notification(userId = userId, message = notificationMessage, taskId = taskId), userId.hashCode())
-                            }
-                        }
-                    },
-                    onFailure = {
-                        Toast.makeText(this, "Failed to add comment", Toast.LENGTH_SHORT).show()
-                    }
-                )
+            if (commentText.isNotEmpty() || attachedUris.isNotEmpty()) {
+                uploadAttachmentsAndAddComment(commentText)
             }
         }
+
+        binding.deleteCommentsButton.setOnClickListener {
+            if (isCommentDeleteMode) {
+                // If in delete mode, clicking trash can should cancel delete mode
+                exitDeleteMode()
+            } else {
+                // Enter delete mode
+                isCommentDeleteMode = true
+                commentAdapter?.setDeleteMode(true)
+                binding.deleteCommentsButton.visibility = View.GONE
+                binding.deleteActionsLayout.visibility = View.VISIBLE
+            }
+        }
+
+        binding.btnDeleteSelected.setOnClickListener {
+            val selectedIds = commentAdapter?.getSelectedCommentIds()
+            if (selectedIds.isNullOrEmpty()) {
+                Toast.makeText(this, "No comments selected", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            
+            AlertDialog.Builder(this)
+                .setTitle("Delete Comments")
+                .setMessage("Are you sure you want to delete ${selectedIds.size} comment(s)?")
+                .setPositiveButton("Delete") { _, _ ->
+                    firebaseHelper.deleteComments(selectedIds,
+                        onSuccess = {
+                            Toast.makeText(this, "Comments deleted", Toast.LENGTH_SHORT).show()
+                            exitDeleteMode()
+                            loadComments()
+                        },
+                        onFailure = {
+                            Toast.makeText(this, "Failed to delete comments", Toast.LENGTH_SHORT).show()
+                        }
+                    )
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        }
+
+        binding.btnDeleteAll.setOnClickListener {
+            val allCommentIds = commentAdapter?.getAllCommentIds() ?: emptyList()
+            if (allCommentIds.isEmpty()) {
+                Toast.makeText(this, "No comments to delete", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            AlertDialog.Builder(this)
+                .setTitle("Delete All Comments")
+                .setMessage("Are you sure you want to delete ALL comments? This cannot be undone.")
+                .setPositiveButton("Delete All") { _, _ ->
+                    firebaseHelper.deleteComments(allCommentIds,
+                        onSuccess = {
+                            Toast.makeText(this, "All comments deleted", Toast.LENGTH_SHORT).show()
+                            exitDeleteMode()
+                            loadComments()
+                        },
+                        onFailure = {
+                            Toast.makeText(this, "Failed to delete comments", Toast.LENGTH_SHORT).show()
+                        }
+                    )
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        }
+    }
+
+    private fun exitDeleteMode() {
+        isCommentDeleteMode = false
+        commentAdapter?.setDeleteMode(false)
+        binding.deleteCommentsButton.visibility = View.VISIBLE
+        binding.deleteActionsLayout.visibility = View.GONE
     }
 
     private val textWatcher = object : TextWatcher {
@@ -525,8 +623,14 @@ class TaskDetailActivity : AppCompatActivity() {
     private fun loadComments() {
         firebaseHelper.getCommentsForTask(taskId,
             onSuccess = { comments ->
+                // Sort comments so latest are at the bottom? Or top? 
+                // Typically messaging apps show latest at bottom, but simple lists show at top.
+                // Keeping original order or sorting by timestamp if needed.
+                val sortedComments = comments.sortedBy { it.timestamp }
+                
                 binding.commentsRecyclerView.layoutManager = LinearLayoutManager(this)
-                binding.commentsRecyclerView.adapter = CommentAdapter(comments)
+                commentAdapter = CommentAdapter(sortedComments, isDeleteMode = isCommentDeleteMode)
+                binding.commentsRecyclerView.adapter = commentAdapter
             },
             onFailure = {}
         )
@@ -589,5 +693,74 @@ class TaskDetailActivity : AppCompatActivity() {
             else -> android.R.color.black
         }
         binding.statusDropdown.setTextColor(ContextCompat.getColor(this, colorRes))
+    }
+
+    private fun addAttachmentPreview(uri: Uri) {
+        attachedUris.add(uri)
+        val previewView = LayoutInflater.from(this).inflate(R.layout.item_attachment_preview, binding.attachmentPreviewLayout, false)
+        val imageView = previewView.findViewById<ImageView>(R.id.attachment_image)
+        val closeButton = previewView.findViewById<ImageView>(R.id.remove_attachment_button)
+
+        Glide.with(this).load(uri).into(imageView)
+
+        closeButton.setOnClickListener {
+            attachedUris.remove(uri)
+            binding.attachmentPreviewLayout.removeView(previewView)
+        }
+
+        binding.attachmentPreviewLayout.addView(previewView)
+    }
+
+    private fun uploadAttachmentsAndAddComment(commentText: String) {
+        val uploadedUrls = mutableListOf<String>()
+        if (attachedUris.isEmpty()) {
+            addComment(commentText, uploadedUrls)
+            return
+        }
+
+        // Show loading indicator if needed
+        var uploadCount = 0
+        attachedUris.forEach { uri ->
+            firebaseHelper.uploadFile(this, uri, "comments", onSuccess = { url ->
+                uploadedUrls.add(url)
+                uploadCount++
+                if (uploadCount == attachedUris.size) {
+                    addComment(commentText, uploadedUrls)
+                }
+            }, onFailure = { e ->
+                Toast.makeText(this, "Failed to upload attachment: ${e.message}", Toast.LENGTH_SHORT).show()
+                uploadCount++ // Still proceed or handle error
+                if (uploadCount == attachedUris.size) {
+                     addComment(commentText, uploadedUrls) // Try adding comment with successful uploads
+                }
+            })
+        }
+    }
+
+    private fun addComment(commentText: String, attachments: List<String>) {
+        val comment = Comment(
+            taskId = taskId,
+            userId = currentUserId,
+            commentText = commentText,
+            timestamp = System.currentTimeMillis(),
+            attachments = attachments
+        )
+        firebaseHelper.addComment(comment,
+            onSuccess = {
+                loadComments()
+                binding.commentInput.text?.clear()
+                attachedUris.clear()
+                binding.attachmentPreviewLayout.removeAllViews()
+                val notificationMessage = "New comment on task: ${originalTask?.name}"
+                originalTask?.assignedTo?.forEach { userId ->
+                    if (userId != currentUserId) {
+                        notificationHelper.sendNotification(Notification(userId = userId, message = notificationMessage, taskId = taskId), userId.hashCode())
+                    }
+                }
+            },
+            onFailure = {
+                Toast.makeText(this, "Failed to add comment", Toast.LENGTH_SHORT).show()
+            }
+        )
     }
 }

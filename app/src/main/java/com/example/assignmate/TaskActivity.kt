@@ -228,24 +228,31 @@ class TaskActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItemS
     override fun onNavigationItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
             R.id.action_home -> {
-                startActivity(Intent(this, MainActivity::class.java))
+                val intent = Intent(this, MainActivity::class.java)
+                intent.putExtra("USER_ID", currentUserId)
+                startActivity(intent)
                 finish()
                 return true
             }
             R.id.action_groups -> {
-                startActivity(Intent(this, GroupActivity::class.java))
+                val intent = Intent(this, GroupActivity::class.java)
+                intent.putExtra("USER_ID", currentUserId)
+                startActivity(intent)
                 finish()
                 return true
             }
             R.id.action_create -> {
                 val intent = Intent(this, GroupActivity::class.java)
+                intent.putExtra("USER_ID", currentUserId)
                 intent.putExtra("SHOW_CREATE_DIALOG", true)
                 startActivity(intent)
                 return false
             }
             R.id.action_tasks -> return true
             R.id.action_profile -> {
-                startActivity(Intent(this, ProfileActivity::class.java))
+                val intent = Intent(this, ProfileActivity::class.java)
+                intent.putExtra("USER_ID", currentUserId)
+                startActivity(intent)
                 finish()
                 return true
             }

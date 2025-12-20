@@ -1,5 +1,7 @@
 package com.example.assignmate
 
+import android.content.Context
+import android.net.Uri
 import android.util.Log
 import com.example.assignmate.model.Comment
 import com.example.assignmate.model.Group
@@ -14,11 +16,13 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.util.UUID
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
@@ -27,6 +31,7 @@ class FirebaseHelper {
 
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
+    private val storage = FirebaseStorage.getInstance()
     private val groupsCollection = db.collection("groups")
     private val usersCollection = db.collection("users")
     private val tasksCollection = db.collection("tasks")
@@ -240,11 +245,15 @@ class FirebaseHelper {
         tasksCollection.whereArrayContains("assignedTo", userId)
             .get()
             .addOnSuccessListener { querySnapshot ->
-                val currentTime = System.currentTimeMillis()
-                val threeDaysInMillis = 3 * 24 * 60 * 60 * 1000
-                val threeDaysFromNow = currentTime + threeDaysInMillis
+                val calendar = java.util.Calendar.getInstance()
+                calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                calendar.set(java.util.Calendar.MINUTE, 0)
+                calendar.set(java.util.Calendar.SECOND, 0)
+                calendar.set(java.util.Calendar.MILLISECOND, 0)
+                val todayStart = calendar.timeInMillis
+
                 val dueTasks = querySnapshot.toObjects(Task::class.java).count {
-                    it.dueDate > currentTime && it.dueDate <= threeDaysFromNow && !it.status.equals("Complete", ignoreCase = true)
+                    it.dueDate != 0L && it.dueDate < todayStart && !it.status.equals("Complete", ignoreCase = true)
                 }
                 onSuccess(dueTasks)
             }
@@ -460,6 +469,17 @@ class FirebaseHelper {
             .addOnFailureListener { e -> onFailure(e) }
     }
 
+    fun deleteComments(commentIds: List<String>, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
+        val batch = db.batch()
+        commentIds.forEach { id ->
+            val docRef = commentsCollection.document(id)
+            batch.delete(docRef)
+        }
+        batch.commit()
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { e -> onFailure(e) }
+    }
+
     fun addNotification(notification: Notification, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
         notificationsCollection.add(notification)
             .addOnSuccessListener { 
@@ -583,5 +603,33 @@ class FirebaseHelper {
         labelsCollection.document(labelId).delete()
             .addOnSuccessListener { onSuccess() }
             .addOnFailureListener { e -> onFailure(e) }
+    }
+
+    fun uploadFile(context: Context, uri: Uri, folderName: String, onSuccess: (String) -> Unit, onFailure: (Exception) -> Unit) {
+        val fileName = UUID.randomUUID().toString()
+        val storageRef = storage.reference.child("$folderName/$fileName")
+
+        try {
+            val contentResolver = context.contentResolver
+            val inputStream = contentResolver.openInputStream(uri)
+
+            if (inputStream != null) {
+                storageRef.putStream(inputStream)
+                    .addOnSuccessListener {
+                        storageRef.downloadUrl.addOnSuccessListener { uri ->
+                            onSuccess(uri.toString())
+                        }.addOnFailureListener { e ->
+                            onFailure(e)
+                        }
+                    }
+                    .addOnFailureListener { e ->
+                        onFailure(e)
+                    }
+            } else {
+                onFailure(Exception("Could not open input stream"))
+            }
+        } catch (e: Exception) {
+            onFailure(e)
+        }
     }
 }

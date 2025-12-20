@@ -111,6 +111,7 @@
 
             <!-- GRID CARDS -->
             <GridLayout
+                android:id="@+id/quick_stats"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:columnCount="2"
@@ -199,16 +200,16 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:textColor="#2C2A28"
-                            android:text="Pending Tasks" />
+                            android:text="Pending Tasks"
+                            android:textColor="#2C2A28" />
 
                         <TextView
                             android:id="@+id/pending_tasks"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="0"
-                            android:textColor="#2C2A28"
-                            android:textAppearance="@style/TextAppearance.AppCompat.Display1" />
+                            android:textAppearance="@style/TextAppearance.AppCompat.Display1"
+                            android:textColor="#2C2A28" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
@@ -231,16 +232,16 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:textColor="#2C2A28"
-                            android:text="Due Tasks" />
+                            android:text="Overdue Tasks"
+                            android:textColor="#2C2A28" />
 
                         <TextView
                             android:id="@+id/due_tasks"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="0"
-                            android:textColor="#E6544F"
-                            android:textAppearance="@style/TextAppearance.AppCompat.Display1" />
+                            android:textAppearance="@style/TextAppearance.AppCompat.Display1"
+                            android:textColor="#E6544F" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
             </GridLayout>

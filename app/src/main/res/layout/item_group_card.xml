@@ -6,6 +6,7 @@
     android:layout_height="wrap_content"
     android:layout_marginHorizontal="16dp"
     android:layout_marginVertical="8dp"
+    app:cardBackgroundColor="#FFFFFFFF"
     app:cardCornerRadius="12dp"
     app:cardElevation="4dp">
 
@@ -30,13 +31,13 @@
 
         <TextView
             android:id="@+id/group_name"
+            android.textColor="@android:color/white"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="16dp"
             android:layout_marginEnd="8dp"
             android:layout_marginBottom="8dp"
             android:textAppearance="?attr/textAppearanceHeadline6"
-            android.textColor="@android:color/white"
             app:layout_constraintBottom_toTopOf="@+id/group_leader"
             app:layout_constraintEnd_toStartOf="@+id/group_overflow_menu"
             app:layout_constraintStart_toStartOf="parent"
@@ -44,11 +45,11 @@
 
         <TextView
             android:id="@+id/group_leader"
+            android.textColor="@android:color/white"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
             android:textAppearance="?attr/textAppearanceBody2"
-            android.textColor="@android:color/white"
             app:layout_constraintBottom_toBottomOf="@+id/group_image"
             app:layout_constraintStart_toStartOf="@+id/group_name"
             tools:text="Group Leader: John Doe" />
@@ -73,6 +74,8 @@
             android:id="@+id/group_details"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:background="#FFFFFFFF"
+            android:backgroundTint="#FFFFFFFF"
             android:orientation="vertical"
             android:padding="16dp"
             app:layout_constraintTop_toBottomOf="@+id/group_image">
