@@ -10,6 +10,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
+import com.example.assignmate.FirebaseHelper
 import com.example.assignmate.R
 import com.example.assignmate.model.Task
 import com.google.android.material.chip.Chip
@@ -23,10 +24,12 @@ class TaskAdapter(
     private val onTaskOptionsClick: (Task, View) -> Unit
 ) : RecyclerView.Adapter<TaskAdapter.TaskViewHolder>() {
 
+    private val firebaseHelper = FirebaseHelper()
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int):
             TaskViewHolder {
         val view = LayoutInflater.from(parent.context).inflate(R.layout.item_task, parent, false)
-        return TaskViewHolder(view)
+        return TaskViewHolder(view, firebaseHelper)
     }
 
     override fun onBindViewHolder(holder: TaskViewHolder, position: Int) {
@@ -42,7 +45,7 @@ class TaskAdapter(
         notifyDataSetChanged()
     }
 
-    class TaskViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+    class TaskViewHolder(itemView: View, private val firebaseHelper: FirebaseHelper) : RecyclerView.ViewHolder(itemView) {
         private val taskName: TextView = itemView.findViewById(R.id.task_name)
         private val taskDescription: TextView = itemView.findViewById(R.id.task_description)
         private val dueDate: TextView = itemView.findViewById(R.id.due_date)
@@ -87,20 +90,59 @@ class TaskAdapter(
             itemView.setOnClickListener { onTaskClick(task) }
             overflowMenu.setOnClickListener { onTaskOptionsClick(task, it) }
 
+            // Handle Assignees
+            assignedMembersChipGroup.removeAllViews()
             if (task.assignedTo.isEmpty()) {
                 assigneesSection.visibility = View.GONE
             } else {
                 assigneesSection.visibility = View.VISIBLE
-                // TODO: Populate assignees
+                firebaseHelper.getUsers(task.assignedTo, onSuccess = { users ->
+                    assignedMembersChipGroup.removeAllViews() // Clear again just in case
+                    users.forEach { user ->
+                        val chip = Chip(context)
+                        chip.text = user.username
+                        chip.isClickable = false
+                        chip.isCheckable = false
+                        assignedMembersChipGroup.addView(chip)
+                    }
+                }, onFailure = {
+                    // Handle failure or keep empty
+                })
             }
 
+            // Handle Labels
+            labelsChipGroup.removeAllViews()
             if (task.labels.isEmpty()) {
                 labelsSection.visibility = View.GONE
             } else {
                 labelsSection.visibility = View.VISIBLE
-                // TODO: Populate labels
+                firebaseHelper.getLabelsForGroup(task.groupId, onSuccess = { allLabels ->
+                    labelsChipGroup.removeAllViews()
+                    val taskLabels = allLabels.filter { task.labels.contains(it.id) }
+                    taskLabels.forEach { label ->
+                        val chip = Chip(context)
+                        chip.text = label.name
+                        chip.isClickable = false
+                        chip.isCheckable = false
+                        try {
+                            val color = Color.parseColor(label.color)
+                            chip.chipBackgroundColor = ColorStateList.valueOf(color)
+                            // Determine text color based on background brightness
+                            val brightness = (Color.red(color) * 299 + Color.green(color) * 587 + Color.blue(color) * 114) / 1000
+                            if (brightness > 128) {
+                                chip.setTextColor(Color.BLACK)
+                            } else {
+                                chip.setTextColor(Color.WHITE)
+                            }
+                        } catch (e: Exception) {
+                            // Default color if parsing fails
+                        }
+                        labelsChipGroup.addView(chip)
+                    }
+                }, onFailure = {
+                    // Handle failure
+                })
             }
-
         }
     }
 }

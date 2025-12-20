@@ -14,6 +14,14 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlin.coroutines.suspendCoroutine
 
 class FirebaseHelper {
 
@@ -243,6 +251,59 @@ class FirebaseHelper {
             .addOnFailureListener { e ->
                 onFailure(e)
             }
+    }
+
+    fun getUpcomingTasksForUser(
+        userId: String,
+        includeLeaderTasks: Boolean,
+        onSuccess: (Map<Group, List<Task>>, List<Task>) -> Unit,
+        onFailure: (Exception) -> Unit
+    ) {
+        CoroutineScope(Dispatchers.Main).launch {
+            try {
+                val groups = suspendCoroutine<List<Group>> { continuation ->
+                    getGroupsForUser(userId, { continuation.resume(it) }, { continuation.resumeWithException(it) })
+                }
+
+                val leaderGroups = groups.filter {
+                    val role = it.members[userId]
+                    role == "leader" || role == "co-leader"
+                }
+
+                val leaderTasksDeferred = leaderGroups.map { group ->
+                    async(Dispatchers.IO) {
+                        val tasks = suspendCoroutine<List<Task>> { continuation ->
+                            getTasksForGroup(group.id, { continuation.resume(it) }, { continuation.resumeWithException(it) })
+                        }
+                        val upcoming = tasks.filter { task ->
+                            val currentTime = System.currentTimeMillis()
+                            val threeDaysInMillis = 3 * 24 * 60 * 60 * 1000
+                            val threeDaysFromNow = currentTime + threeDaysInMillis
+                            task.dueDate > currentTime && task.dueDate <= threeDaysFromNow && !task.status.equals("Complete", ignoreCase = true)
+                        }
+                        group to upcoming
+                    }
+                }
+
+                val userTasksDeferred = async(Dispatchers.IO) {
+                    suspendCoroutine<List<Task>> { continuation ->
+                        getUpcomingTasksForUser(userId, { continuation.resume(it) }, { continuation.resumeWithException(it) })
+                    }
+                }
+
+                val leaderTasksResult = leaderTasksDeferred.map { it.await() }.toMap()
+                val userTasksResult = userTasksDeferred.await()
+
+                val filteredUserTasks = userTasksResult.filter { task ->
+                    !leaderTasksResult.any { (_, tasks) -> tasks.any { it.uid == task.uid } }
+                }
+
+                onSuccess(leaderTasksResult, filteredUserTasks)
+
+            } catch (e: Exception) {
+                onFailure(e)
+            }
+        }
     }
 
     fun getUpcomingTasksForUser(userId: String, onSuccess: (List<Task>) -> Unit, onFailure: (Exception) -> Unit) {
@@ -500,9 +561,11 @@ class FirebaseHelper {
             .addOnFailureListener { e -> onFailure(e) }
     }
 
-    fun addLabel(label: Label, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
+    fun addLabel(label: Label, onSuccess: (String) -> Unit, onFailure: (Exception) -> Unit) {
         labelsCollection.add(label)
-            .addOnSuccessListener { onSuccess() }
+            .addOnSuccessListener { documentReference ->
+                onSuccess(documentReference.id)
+            }
             .addOnFailureListener { e -> onFailure(e) }
     }
 

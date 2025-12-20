@@ -6,6 +6,8 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Color
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
@@ -44,6 +46,8 @@ class SingleGroupActivity : AppCompatActivity() {
     private var currentUserId: String = ""
     private var currentUserRole: String? = null
     private var allTasks = listOf<Task>()
+    private var currentFilterStatus = "All"
+    private var currentSearchQuery = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -95,25 +99,51 @@ class SingleGroupActivity : AppCompatActivity() {
     }
 
     private fun setupFilter() {
+        // Search Input Logic
+        binding.searchInput.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                currentSearchQuery = s.toString()
+                filterTasks()
+            }
+        })
+
+        // Dropdown Logic
         val filterOptions = arrayOf("All", "Not Started", "In progress", "Complete")
         val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, filterOptions)
         binding.filterDropdown.setAdapter(adapter)
         binding.filterDropdown.setOnItemClickListener { _, _, position, _ ->
-            val selectedStatus = filterOptions[position]
-            val fragment = supportFragmentManager.fragments.find { it is GroupTasksFragment } as? GroupTasksFragment
-            if (selectedStatus == "All") {
-                fragment?.displayTasks(allTasks)
-            } else {
-                fragment?.displayTasks(allTasks.filter { it.status == selectedStatus })
+            currentFilterStatus = filterOptions[position]
+            filterTasks()
+        }
+    }
+
+    private fun filterTasks() {
+        val fragment = supportFragmentManager.fragments.find { it is GroupTasksFragment } as? GroupTasksFragment
+        
+        val filteredByStatus = if (currentFilterStatus == "All") {
+            allTasks
+        } else {
+            allTasks.filter { it.status == currentFilterStatus }
+        }
+
+        val finalFilteredList = if (currentSearchQuery.isEmpty()) {
+            filteredByStatus
+        } else {
+            filteredByStatus.filter { 
+                it.name.contains(currentSearchQuery, ignoreCase = true) || 
+                it.description.contains(currentSearchQuery, ignoreCase = true) 
             }
         }
+
+        fragment?.displayTasks(finalFilteredList)
     }
 
     fun loadTasks() {
         firebaseHelper.getTasksForGroup(groupId, {
             allTasks = it
-            val fragment = supportFragmentManager.fragments.find { it is GroupTasksFragment } as? GroupTasksFragment
-            fragment?.displayTasks(allTasks)
+            filterTasks()
         }, {})
     }
 
@@ -329,6 +359,11 @@ class SingleGroupActivity : AppCompatActivity() {
                             for (user in users) {
                                 val chip = Chip(this)
                                 chip.text = user.username
+                                chip.isCloseIconVisible = true
+                                chip.setOnCloseIconClickListener {
+                                    assignedMembersChipGroup.removeView(chip)
+                                    assignedTo.remove(user.id)
+                                }
                                 assignedMembersChipGroup.addView(chip)
                             }
                         }, onFailure = {})
@@ -344,6 +379,7 @@ class SingleGroupActivity : AppCompatActivity() {
             showLabelDialog(selectedLabelIds) { labelIds ->
                 selectedLabelIds.clear()
                 selectedLabelIds.addAll(labelIds)
+                
                 labelsChipGroup.removeAllViews()
                 firebaseHelper.getLabelsForGroup(groupId, {
                     val selectedLabels = it.filter { label -> selectedLabelIds.contains(label.id) }
@@ -351,6 +387,11 @@ class SingleGroupActivity : AppCompatActivity() {
                         val chip = Chip(this)
                         chip.text = label.name
                         chip.chipBackgroundColor = android.content.res.ColorStateList.valueOf(Color.parseColor(label.color))
+                        chip.isCloseIconVisible = true
+                        chip.setOnCloseIconClickListener {
+                            labelsChipGroup.removeView(chip)
+                            selectedLabelIds.remove(label.id)
+                        }
                         labelsChipGroup.addView(chip)
                     }
                 }, {})
@@ -419,23 +460,43 @@ class SingleGroupActivity : AppCompatActivity() {
     }
 
     private fun showLabelDialog(selectedLabelIds: MutableSet<String>, onLabelsSelected: (Set<String>) -> Unit) {
-        firebaseHelper.getLabelsForGroup(groupId, {
-            val labelAdapter = SelectableLabelAdapter(it, selectedLabelIds) {
-                showAddEditLabelDialog(null) { showLabelDialog(selectedLabelIds, onLabelsSelected) }
-            }
-            val recyclerView = RecyclerView(this).apply {
-                adapter = labelAdapter
-                layoutManager = LinearLayoutManager(this@SingleGroupActivity)
-            }
+        firebaseHelper.getLabelsForGroup(groupId, { labels ->
+            val view = layoutInflater.inflate(R.layout.dialog_select_label, null)
+            val recyclerView = view.findViewById<RecyclerView>(R.id.labels_recycler_view)
+            val addLabelButton = view.findViewById<View>(R.id.add_label_button)
 
-            AlertDialog.Builder(this)
-                .setTitle("Select Labels")
-                .setView(recyclerView)
+            val dialog = AlertDialog.Builder(this)
+                .setView(view)
                 .setPositiveButton("OK") { _, _ ->
-                    onLabelsSelected(labelAdapter.selectedLabelIds)
+                    onLabelsSelected((recyclerView.adapter as SelectableLabelAdapter).selectedLabelIds.toSet())
                 }
                 .setNegativeButton("Cancel", null)
-                .show()
+                .create()
+
+            val labelAdapter = SelectableLabelAdapter(labels, selectedLabelIds) {
+                // Adapter selection logic
+                dialog.dismiss()
+                showAddEditLabelDialog(null) { newLabelId ->
+                    if (newLabelId != null) {
+                        selectedLabelIds.add(newLabelId)
+                    }
+                    showLabelDialog(selectedLabelIds, onLabelsSelected)
+                }
+            }
+            recyclerView.adapter = labelAdapter
+            recyclerView.layoutManager = LinearLayoutManager(this)
+
+            addLabelButton.setOnClickListener {
+                dialog.dismiss()
+                showAddEditLabelDialog(null) { newLabelId ->
+                    if (newLabelId != null) {
+                        selectedLabelIds.add(newLabelId)
+                    }
+                    showLabelDialog(selectedLabelIds, onLabelsSelected)
+                }
+            }
+
+            dialog.show()
         }, {})
     }
 
@@ -472,7 +533,7 @@ class SingleGroupActivity : AppCompatActivity() {
         builder.show()
     }
 
-    private fun showAddEditLabelDialog(label: Label? = null, onLabelAdded: () -> Unit) {
+    private fun showAddEditLabelDialog(label: Label? = null, onLabelAdded: (String?) -> Unit) {
         val builder = AlertDialog.Builder(this)
         val view = layoutInflater.inflate(R.layout.dialog_add_label, null)
         builder.setView(view)
@@ -505,12 +566,12 @@ class SingleGroupActivity : AppCompatActivity() {
             if (labelName.isNotEmpty()) {
                 val colorString = String.format("#%06X", 0xFFFFFF and selectedColor)
                 if (label == null) {
-                    firebaseHelper.addLabel(Label(name = labelName, color = colorString, groupId = groupId), {
-                        onLabelAdded()
+                    firebaseHelper.addLabel(Label(name = labelName, color = colorString, groupId = groupId), { labelId ->
+                        onLabelAdded(labelId)
                     }, {})
                 } else {
                     firebaseHelper.updateLabel(label.id, labelName, colorString, {
-                        onLabelAdded()
+                        onLabelAdded(null)
                     }, {})
                 }
             }

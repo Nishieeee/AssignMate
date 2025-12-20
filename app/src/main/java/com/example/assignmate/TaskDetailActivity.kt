@@ -418,7 +418,7 @@ class TaskDetailActivity : AppCompatActivity() {
                 val colorString = String.format("#%06X", 0xFFFFFF and selectedColor)
                 if (label == null) {
                     originalTask?.groupId?.let {
-                        firebaseHelper.addLabel(Label(name = labelName, color = colorString, groupId = it), {
+                        firebaseHelper.addLabel(Label(name = labelName, color = colorString, groupId = it), { _ ->
                             onLabelAdded()
                         }, {})
                     }
