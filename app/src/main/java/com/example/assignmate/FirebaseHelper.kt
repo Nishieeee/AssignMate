@@ -18,6 +18,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -41,7 +42,7 @@ class FirebaseHelper {
     private val usersCollection = db.collection("users")
     private val tasksCollection = db.collection("tasks")
     private val commentsCollection = db.collection("comments")
-    private val notificationsCollection = db.collection("notifications")
+    // notificationsCollection is removed as we now use users/{userId}/notifications
     private val labelsCollection = db.collection("labels")
 
 
@@ -665,7 +666,8 @@ class FirebaseHelper {
     }
 
     fun addNotification(notification: Notification, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
-        notificationsCollection.add(notification)
+        // Send to users/{userId}/notifications instead of global notifications
+        usersCollection.document(notification.userId).collection("notifications").add(notification)
             .addOnSuccessListener { 
                 Log.d("FirebaseHelper", "Notification added successfully")
                 onSuccess()
@@ -677,22 +679,37 @@ class FirebaseHelper {
     }
 
     fun getNotificationsForUser(userId: String, onSuccess: (List<Notification>) -> Unit, onFailure: (Exception) -> Unit) {
-        notificationsCollection.whereEqualTo("userId", userId).get()
+        usersCollection.document(userId).collection("notifications").get()
             .addOnSuccessListener { querySnapshot ->
                 val notifications = querySnapshot.toObjects(Notification::class.java).sortedByDescending { it.timestamp }
                 onSuccess(notifications)
             }
             .addOnFailureListener { e -> onFailure(e) }
     }
+    
+    // NEW: Real-time listener for notifications
+    fun listenToNotifications(userId: String, onSuccess: (List<Notification>) -> Unit, onFailure: (Exception) -> Unit): ListenerRegistration {
+        return usersCollection.document(userId).collection("notifications")
+            .addSnapshotListener { querySnapshot, e ->
+                if (e != null) {
+                    onFailure(e)
+                    return@addSnapshotListener
+                }
+                if (querySnapshot != null) {
+                     val notifications = querySnapshot.toObjects(Notification::class.java).sortedByDescending { it.timestamp }
+                     onSuccess(notifications)
+                }
+            }
+    }
 
-    fun markNotificationAsRead(notificationId: String, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
-        notificationsCollection.document(notificationId).update("isRead", true)
+    fun markNotificationAsRead(notificationId: String, userId: String, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
+        usersCollection.document(userId).collection("notifications").document(notificationId).update("isRead", true)
             .addOnSuccessListener { onSuccess() }
             .addOnFailureListener { e -> onFailure(e) }
     }
 
     fun markAllNotificationsAsRead(userId: String, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
-        notificationsCollection.whereEqualTo("userId", userId).get()
+        usersCollection.document(userId).collection("notifications").get()
             .addOnSuccessListener { querySnapshot ->
                 val batch = db.batch()
                 for (document in querySnapshot.documents) {
@@ -705,14 +722,14 @@ class FirebaseHelper {
             .addOnFailureListener { e -> onFailure(e) }
     }
 
-    fun deleteNotification(notificationId: String, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
-        notificationsCollection.document(notificationId).delete()
+    fun deleteNotification(notificationId: String, userId: String, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
+        usersCollection.document(userId).collection("notifications").document(notificationId).delete()
             .addOnSuccessListener { onSuccess() }
             .addOnFailureListener { e -> onFailure(e) }
     }
 
     fun deleteAllNotifications(userId: String, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
-        notificationsCollection.whereEqualTo("userId", userId).get()
+        usersCollection.document(userId).collection("notifications").get()
             .addOnSuccessListener { querySnapshot ->
                 val batch = db.batch()
                 for (document in querySnapshot.documents) {
@@ -726,7 +743,7 @@ class FirebaseHelper {
     }
 
     fun getUnreadNotificationCount(userId: String, onSuccess: (Int) -> Unit, onFailure: (Exception) -> Unit) {
-        notificationsCollection.whereEqualTo("userId", userId).whereEqualTo("isRead", false).get()
+        usersCollection.document(userId).collection("notifications").whereEqualTo("isRead", false).get()
             .addOnSuccessListener { querySnapshot ->
                 onSuccess(querySnapshot.size())
             }

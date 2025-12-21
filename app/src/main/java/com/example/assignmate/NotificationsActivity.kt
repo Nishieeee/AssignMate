@@ -10,6 +10,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.assignmate.adapter.NotificationAdapter
 import com.example.assignmate.databinding.ActivityNotificationsBinding
 import com.example.assignmate.model.Notification
+import com.google.firebase.firestore.ListenerRegistration
 
 class NotificationsActivity : AppCompatActivity() {
 
@@ -19,6 +20,7 @@ class NotificationsActivity : AppCompatActivity() {
     private var currentUserId: String = ""
     private val notifications = mutableListOf<Notification>()
     private var isSelectionMode = false
+    private var notificationsListener: ListenerRegistration? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -37,8 +39,13 @@ class NotificationsActivity : AppCompatActivity() {
 
         setupToolbar()
         setupRecyclerView()
-        loadNotifications()
+        setupNotificationsListener() // Use real-time listener instead of one-time load
         setupClickListeners()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        notificationsListener?.remove()
     }
 
     private fun setupToolbar() {
@@ -49,7 +56,14 @@ class NotificationsActivity : AppCompatActivity() {
         notificationAdapter = NotificationAdapter(
             notifications,
             onMarkAsReadClicked = { notification ->
-                firebaseHelper.markNotificationAsRead(notification.id, { loadNotifications() }, {})
+                // The adapter performs an optimistic update locally.
+                // We send the update to Firestore.
+                // Since we are using a real-time listener (setupNotificationsListener),
+                // Firestore will fire an event (possibly immediately with pending writes)
+                // which will update the list again. This ensures consistency.
+                firebaseHelper.markNotificationAsRead(notification.id, currentUserId, { }, {
+                    Toast.makeText(this, "Failed to update notification status", Toast.LENGTH_SHORT).show()
+                })
             },
             onItemLongClicked = {
                 toggleSelectionMode()
@@ -61,11 +75,11 @@ class NotificationsActivity : AppCompatActivity() {
         }
     }
 
-    private fun loadNotifications() {
-        firebaseHelper.getNotificationsForUser(currentUserId, 
-            onSuccess = {
+    private fun setupNotificationsListener() {
+        notificationsListener = firebaseHelper.listenToNotifications(currentUserId,
+            onSuccess = { updatedNotifications ->
                 notifications.clear()
-                notifications.addAll(it)
+                notifications.addAll(updatedNotifications)
                 notificationAdapter.notifyDataSetChanged()
 
                 if (notifications.isEmpty()) {
@@ -130,7 +144,8 @@ class NotificationsActivity : AppCompatActivity() {
             .setTitle("Mark All As Read")
             .setMessage("Are you sure you want to mark all messages as read?")
             .setPositiveButton("Yes") { _, _ ->
-                firebaseHelper.markAllNotificationsAsRead(currentUserId, { loadNotifications() }, {})
+                // Listener will update UI automatically
+                firebaseHelper.markAllNotificationsAsRead(currentUserId, { }, {})
             }
             .setNegativeButton("No", null)
             .show()
@@ -142,7 +157,7 @@ class NotificationsActivity : AppCompatActivity() {
             .setMessage("Are you sure you want to delete ${selectedNotifications.size} selected notifications?")
             .setPositiveButton("Delete") { _, _ ->
                 selectedNotifications.forEach { notification ->
-                    firebaseHelper.deleteNotification(notification.id, { loadNotifications() }, {})
+                    firebaseHelper.deleteNotification(notification.id, currentUserId, { }, {})
                 }
                 toggleSelectionMode()
             }
@@ -155,7 +170,7 @@ class NotificationsActivity : AppCompatActivity() {
             .setTitle("Delete All Notifications")
             .setMessage("Are you sure you want to delete all notifications?")
             .setPositiveButton("Delete") { _, _ ->
-                firebaseHelper.deleteAllNotifications(currentUserId, { loadNotifications() }, {})
+                firebaseHelper.deleteAllNotifications(currentUserId, { }, {})
                 toggleSelectionMode()
             }
             .setNegativeButton("Cancel", null)

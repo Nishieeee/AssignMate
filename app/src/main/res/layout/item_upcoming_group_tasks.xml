@@ -18,7 +18,7 @@
             android:id="@+id/urgency_indicator"
             android:layout_width="4dp"
             android:layout_height="0dp"
-            android:background="#E6544F"
+            android:background="#F28A30"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
@@ -52,8 +52,7 @@
             android:id="@+id/earliest_due_date"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:background="@drawable/due_date_background"
+            android:background="#4EF28A30"
             android:paddingStart="8dp"
             android:paddingTop="4dp"
             android:paddingEnd="8dp"

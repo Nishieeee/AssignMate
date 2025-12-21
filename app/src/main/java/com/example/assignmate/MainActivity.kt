@@ -27,17 +27,20 @@ import com.example.assignmate.model.Group
 import com.example.assignmate.model.Task
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.ListenerRegistration
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var firebaseHelper: FirebaseHelper
+    private lateinit var notificationHelper: NotificationHelper
     private lateinit var auth: FirebaseAuth
     private var currentUserId: String = ""
     private var selectedImageUri: Uri? = null
     private var currentGroupImagePreview: ImageView? = null
     private var currentRemoveImageButton: ImageButton? = null
     private var currentUploadImageButton: TextView? = null
+    private var notificationListener: ListenerRegistration? = null
 
     private val pickImageLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null) {
@@ -57,9 +60,14 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         firebaseHelper = FirebaseHelper()
+        notificationHelper = NotificationHelper()
         auth = FirebaseAuth.getInstance()
         // Use FirebaseAuth as primary source, fallback to Intent
         currentUserId = auth.currentUser?.uid ?: intent.getStringExtra("USER_ID") ?: ""
+
+        if (currentUserId.isNotEmpty()) {
+            notificationListener = notificationHelper.setupNotificationBadge(currentUserId, binding.notificationBadge)
+        }
 
         binding.notificationBell.setOnClickListener {
             val intent = Intent(this, NotificationsActivity::class.java)
@@ -101,6 +109,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        notificationListener?.remove()
+    }
+
     override fun onResume() {
         super.onResume()
         // Re-fetch current user ID just in case
@@ -124,19 +137,7 @@ class MainActivity : AppCompatActivity() {
             }
         )
 
-        firebaseHelper.getUnreadNotificationCount(currentUserId,
-            onSuccess = { count ->
-                if (count > 0) {
-                    binding.notificationBadge.visibility = View.VISIBLE
-                    binding.notificationBadge.text = count.toString()
-                } else {
-                    binding.notificationBadge.visibility = View.GONE
-                }
-            },
-            onFailure = {
-                binding.notificationBadge.visibility = View.GONE
-            }
-        )
+        // Notification count is now handled by notificationListener in onCreate
 
         firebaseHelper.getGroupsForUser(currentUserId,
             onSuccess = { groups ->

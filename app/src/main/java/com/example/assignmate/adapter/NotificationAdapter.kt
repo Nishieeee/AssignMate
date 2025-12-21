@@ -64,13 +64,11 @@ class NotificationAdapter(
             if (notification.isRead) {
                 // READ: No button, #FFF8F0 background
                 val readColor = Color.parseColor("#FFF8F0")
-                binding.notificationContainer.setBackgroundColor(readColor)
                 cardView?.setCardBackgroundColor(readColor)
                 binding.markReadButton.visibility = View.GONE
             } else {
                 // UNREAD: Button visible, White background
                 val unreadColor = Color.WHITE
-                binding.notificationContainer.setBackgroundColor(unreadColor)
                 cardView?.setCardBackgroundColor(unreadColor)
                 binding.markReadButton.visibility = View.VISIBLE
             }
@@ -81,7 +79,18 @@ class NotificationAdapter(
             binding.notificationTimestamp.setTextColor(Color.GRAY)
 
             binding.markReadButton.setOnClickListener {
-                onMarkAsReadClicked(notification)
+                val currentPosition = bindingAdapterPosition
+                if (currentPosition != RecyclerView.NO_POSITION) {
+                    // Optimistic Update: Update local model immediately
+                    val updatedNotification = notification.copy(isRead = true)
+                    notifications[currentPosition] = updatedNotification
+                    
+                    // Notify adapter to refresh this specific row immediately
+                    notifyItemChanged(currentPosition)
+                    
+                    // Proceed with Firestore update
+                    onMarkAsReadClicked(notification)
+                }
             }
 
             if (isSelectionMode) {

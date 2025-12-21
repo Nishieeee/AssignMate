@@ -56,35 +56,36 @@
                         android:textColor="#6DBE45" />
                 </LinearLayout>
 
-                <ImageView
-                    android:id="@+id/notification_bell"
+                <FrameLayout
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_alignParentEnd="true"
                     android:layout_centerVertical="true"
-                    android:layout_marginEnd="16dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:src="@drawable/ic_notifications"
-                    app:tint="#2C2A28" />
+                    android:layout_marginEnd="16dp">
 
-                <TextView
-                    android:id="@+id/notification_badge"
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
-                    android:layout_alignTop="@id/notification_bell"
-                    android:layout_alignEnd="@id/notification_bell"
-                    android:background="@drawable/notification_badge"
-                    android:backgroundTint="#E6544F"
-                    android:elevation="2dp"
-                    android:gravity="center"
-                    android:textColor="#FFFFFF"
-                    android:textSize="10sp"
-                    android:translationX="-8dp"
-                    android:translationY="4dp"
-                    android:visibility="gone"
-                    tools:text="3" />
+                    <ImageView
+                        android:id="@+id/notification_bell"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:padding="8dp"
+                        android:src="@drawable/ic_notifications"
+                        app:tint="#2C2A28" />
+
+                    <TextView
+                        android:id="@+id/notification_badge"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:layout_gravity="top|end"
+                        android:background="@drawable/notification_badge"
+                        android:gravity="center"
+                        android:textColor="@android:color/white"
+                        android:textSize="10sp"
+                        android:visibility="gone"
+                        tools:text="3" />
+                </FrameLayout>
 
             </RelativeLayout>
 
