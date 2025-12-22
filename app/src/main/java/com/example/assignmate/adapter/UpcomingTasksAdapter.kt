@@ -19,6 +19,7 @@ sealed class UpcomingItem {
 class UpcomingTasksAdapter(
     private var items: List<UpcomingItem>,
     private val onTaskClicked: (Task) -> Unit,
+    private val onGroupClicked: (Group) -> Unit,
     private val getGroup: (String, (Group?) -> Unit) -> Unit
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
@@ -62,6 +63,24 @@ class UpcomingTasksAdapter(
         notifyDataSetChanged()
     }
 
+    private fun getDaysDifference(dueDate: Long): Long {
+        val todayCalendar = Calendar.getInstance()
+        todayCalendar.set(Calendar.HOUR_OF_DAY, 0)
+        todayCalendar.set(Calendar.MINUTE, 0)
+        todayCalendar.set(Calendar.SECOND, 0)
+        todayCalendar.set(Calendar.MILLISECOND, 0)
+
+        val dueCalendar = Calendar.getInstance()
+        dueCalendar.timeInMillis = dueDate
+        dueCalendar.set(Calendar.HOUR_OF_DAY, 0)
+        dueCalendar.set(Calendar.MINUTE, 0)
+        dueCalendar.set(Calendar.SECOND, 0)
+        dueCalendar.set(Calendar.MILLISECOND, 0)
+
+        val diff = dueCalendar.timeInMillis - todayCalendar.timeInMillis
+        return TimeUnit.MILLISECONDS.toDays(diff)
+    }
+
     inner class TaskViewHolder(private val binding: ItemUpcomingTaskBinding) : RecyclerView.ViewHolder(binding.root) {
         fun bind(task: Task) {
             binding.taskName.text = task.name
@@ -70,18 +89,12 @@ class UpcomingTasksAdapter(
                 binding.groupName.text = group?.name ?: ""
             }
 
-            val diff = task.dueDate - System.currentTimeMillis()
-            val days = TimeUnit.MILLISECONDS.toDays(diff)
-
-            val calendar = Calendar.getInstance()
-            val today = calendar.get(Calendar.DAY_OF_YEAR)
-            calendar.timeInMillis = task.dueDate
-            val dueDateDay = calendar.get(Calendar.DAY_OF_YEAR)
+            val daysDiff = getDaysDifference(task.dueDate)
 
             binding.dueDate.text = when {
-                today == dueDateDay -> "Due today"
-                days > 1 -> "$days days left"
-                days == 1L -> "1 day left"
+                daysDiff == 0L -> "Due today"
+                daysDiff == 1L -> "1 day left"
+                daysDiff > 1L -> "$daysDiff days left"
                 else -> "Due today"
             }
 
@@ -99,23 +112,21 @@ class UpcomingTasksAdapter(
             if (item.earliestDueDate > 0) {
                 binding.earliestDueDate.visibility = View.VISIBLE
                 
-                val diff = item.earliestDueDate - System.currentTimeMillis()
-                val days = TimeUnit.MILLISECONDS.toDays(diff)
-
-                val calendar = Calendar.getInstance()
-                val today = calendar.get(Calendar.DAY_OF_YEAR)
-                calendar.timeInMillis = item.earliestDueDate
-                val dueDateDay = calendar.get(Calendar.DAY_OF_YEAR)
+                val daysDiff = getDaysDifference(item.earliestDueDate)
 
                 val dueDateText = when {
-                    today == dueDateDay -> "Due today"
-                    days > 1 -> "$days days left"
-                    days == 1L -> "1 day left"
+                    daysDiff == 0L -> "Due today"
+                    daysDiff == 1L -> "1 day left"
+                    daysDiff > 1L -> "$daysDiff days left"
                     else -> "Due today"
                 }
                 binding.earliestDueDate.text = "Earliest due: $dueDateText"
             } else {
                 binding.earliestDueDate.visibility = View.GONE
+            }
+
+            binding.root.setOnClickListener {
+                onGroupClicked(item.group)
             }
         }
     }

@@ -47,6 +47,10 @@ class LoginActivity : AppCompatActivity() {
         binding.registerPrompt.setOnClickListener {
             startActivity(Intent(this, RegisterActivity::class.java))
         }
+
+        binding.forgotPassword.setOnClickListener {
+            startActivity(Intent(this, ForgetPasswordActivity::class.java))
+        }
     }
 
     override fun onStart() {

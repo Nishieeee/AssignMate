@@ -40,6 +40,7 @@
         <activity android:name=".SettingsActivity" />
         <activity android:name=".TaskActivity" />
         <activity android:name=".FullScreenImageActivity" />
+        <activity android:name=".ForgetPasswordActivity" />
 
         <meta-data
             android:name="preloaded_fonts"

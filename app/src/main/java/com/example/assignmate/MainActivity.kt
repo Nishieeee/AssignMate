@@ -236,8 +236,14 @@ class MainActivity : AppCompatActivity() {
                     binding.upcomingDeadlinesRecyclerView.layoutManager = LinearLayoutManager(this)
                     val adapter = UpcomingTasksAdapter(finalItems, {
                         task ->
-                        val intent = Intent(this, TaskDetailActivity::class.java)
-                        intent.putExtra("TASK_ID", task.uid)
+                        val intent = Intent(this, SingleGroupActivity::class.java)
+                        intent.putExtra("GROUP_ID", task.groupId)
+                        intent.putExtra("USER_ID", currentUserId)
+                        startActivity(intent)
+                    }, {
+                        group ->
+                        val intent = Intent(this, SingleGroupActivity::class.java)
+                        intent.putExtra("GROUP_ID", group.id)
                         intent.putExtra("USER_ID", currentUserId)
                         startActivity(intent)
                     }, { groupId, callback ->
