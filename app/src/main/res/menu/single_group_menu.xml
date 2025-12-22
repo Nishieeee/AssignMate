@@ -1,18 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
-<menu xmlns:android="http://schemas.android.com/apk/res/android">
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
-        android:id="@+id/action_add_to_favourite"
-        android:title="Add to Favorite" />
+        android:id="@+id/action_add_to_favorites"
+        android:title="Add to Favorites"
+        app:showAsAction="never" />
     <item
         android:id="@+id/action_edit_group"
-        android:title="Edit Group" />
+        android:title="Edit Group"
+        app:showAsAction="never" />
     <item
         android:id="@+id/action_delete_group"
-        android:title="Delete Group" />
-    <item
-        android:id="@+id/action_manage_labels"
-        android:title="Manage Labels" />
+        android:title="Delete Group"
+        app:showAsAction="never" />
     <item
         android:id="@+id/action_add_members"
-        android:title="Add Members" />
+        android:title="Add Members"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_manage_labels"
+        android:title="Manage Labels"
+        app:showAsAction="never" />
 </menu>

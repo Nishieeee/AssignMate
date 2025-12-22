@@ -36,7 +36,7 @@ import java.util.Locale
 class FirebaseHelper {
 
     private val db = FirebaseFirestore.getInstance()
-    private val auth = FirebaseAuth.getInstance()
+    val auth = FirebaseAuth.getInstance()
     private val storage = FirebaseStorage.getInstance()
     private val groupsCollection = db.collection("groups")
     private val usersCollection = db.collection("users")
@@ -220,6 +220,33 @@ class FirebaseHelper {
             FieldValue.arrayRemove(userId)
         }
         groupsCollection.document(groupId).update("favouriteBy", update)
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { e -> onFailure(e) }
+    }
+
+    fun isGroupFavorite(userId: String, groupId: String, onResult: (Boolean) -> Unit) {
+        groupsCollection.document(groupId).get()
+            .addOnSuccessListener { documentSnapshot ->
+                val group = documentSnapshot.toObject(Group::class.java)
+                if (group != null) {
+                    onResult(group.favouriteBy.contains(userId))
+                } else {
+                    onResult(false)
+                }
+            }
+            .addOnFailureListener {
+                onResult(false)
+            }
+    }
+
+    fun addFavorite(userId: String, groupId: String, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
+        groupsCollection.document(groupId).update("favouriteBy", FieldValue.arrayUnion(userId))
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { e -> onFailure(e) }
+    }
+
+    fun removeFavorite(userId: String, groupId: String, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
+        groupsCollection.document(groupId).update("favouriteBy", FieldValue.arrayRemove(userId))
             .addOnSuccessListener { onSuccess() }
             .addOnFailureListener { e -> onFailure(e) }
     }
@@ -602,7 +629,9 @@ class FirebaseHelper {
                 val comments = querySnapshot.toObjects(Comment::class.java)
                 onSuccess(comments)
             }
-            .addOnFailureListener { e -> onFailure(e) }
+            .addOnFailureListener { e ->
+                onFailure(e)
+            }
     }
 
     fun addComment(comment: Comment, onSuccess: (String) -> Unit, onFailure: (Exception) -> Unit) {

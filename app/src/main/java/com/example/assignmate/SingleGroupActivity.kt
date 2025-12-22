@@ -54,7 +54,8 @@ class SingleGroupActivity : AppCompatActivity() {
     private var allTasks = listOf<Task>()
     private var currentFilterStatus = "All"
     private var currentSearchQuery = ""
-    
+    private var isFavorite = false
+
     private var selectedImageUri: Uri? = null
     private var currentGroupImagePreview: ImageView? = null
     private var currentRemoveImageButton: ImageButton? = null
@@ -81,7 +82,7 @@ class SingleGroupActivity : AppCompatActivity() {
 
         firebaseHelper = FirebaseHelper()
         groupId = intent.getStringExtra("GROUP_ID") ?: ""
-        currentUserId = intent.getStringExtra("USER_ID") ?: ""
+        currentUserId = firebaseHelper.auth.currentUser?.uid ?: ""
 
         setSupportActionBar(binding.toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
@@ -102,6 +103,11 @@ class SingleGroupActivity : AppCompatActivity() {
                 Toast.makeText(this, "Failed to load group details", Toast.LENGTH_SHORT).show()
             }
         )
+
+        firebaseHelper.isGroupFavorite(currentUserId, groupId) { isFav ->
+            isFavorite = isFav
+            invalidateOptionsMenu()
+        }
 
         binding.fabAddTaskButton.setOnClickListener {
             showCreateTaskDialog()
@@ -180,15 +186,23 @@ class SingleGroupActivity : AppCompatActivity() {
         val canManageGroup = currentUserRole == "leader" || currentUserRole == "co-leader"
         menu?.findItem(R.id.action_edit_group)?.isVisible = canManageGroup
         menu?.findItem(R.id.action_delete_group)?.isVisible = canManageGroup
-        menu?.findItem(R.id.action_add_to_favourite)?.isVisible = false
         menu?.findItem(R.id.action_manage_labels)?.isVisible = canManageGroup
         menu?.findItem(R.id.action_add_members)?.isVisible = canManageGroup
+        
+        val favoriteItem = menu?.findItem(R.id.action_add_to_favorites)
+        if (isFavorite) {
+            favoriteItem?.title = "Remove from Favorites"
+        } else {
+            favoriteItem?.title = "Add to Favorites"
+        }
+        
         return super.onPrepareOptionsMenu(menu)
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
             android.R.id.home -> finish()
+            R.id.action_add_to_favorites -> toggleFavoriteStatus()
             R.id.action_edit_group -> showEditGroupDialog()
             R.id.action_delete_group -> showDeleteGroupDialog()
             R.id.action_add_members -> showAddMembersDialog()
@@ -196,6 +210,32 @@ class SingleGroupActivity : AppCompatActivity() {
             else -> return super.onOptionsItemSelected(item)
         }
         return true
+    }
+    
+    private fun toggleFavoriteStatus(){
+        if (isFavorite) {
+            firebaseHelper.removeFavorite(currentUserId, groupId,
+                onSuccess = {
+                    isFavorite = false
+                    invalidateOptionsMenu()
+                    Toast.makeText(this, "Removed from favorites", Toast.LENGTH_SHORT).show()
+                },
+                onFailure = {
+                    Toast.makeText(this, "Failed to remove from favorites", Toast.LENGTH_SHORT).show()
+                }
+            )
+        } else {
+            firebaseHelper.addFavorite(currentUserId, groupId,
+                onSuccess = {
+                    isFavorite = true
+                    invalidateOptionsMenu()
+                    Toast.makeText(this, "Added to favorites", Toast.LENGTH_SHORT).show()
+                },
+                onFailure = {
+                     Toast.makeText(this, "Failed to add to favorites", Toast.LENGTH_SHORT).show()
+                }
+            )
+        }
     }
 
     private fun showEditGroupDialog() {
