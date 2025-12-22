@@ -303,6 +303,10 @@ class TaskDetailActivity : AppCompatActivity() {
                 binding.deleteActionsLayout.visibility = View.VISIBLE
             }
         }
+        
+        binding.btnCancelDelete.setOnClickListener {
+            exitDeleteMode()
+        }
 
         binding.btnDeleteSelected.setOnClickListener {
             val selectedIds = commentAdapter?.getSelectedCommentIds()
