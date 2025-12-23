@@ -79,8 +79,8 @@ class GroupedTaskAdapter(
             val context = itemView.context
             val (backgroundColor, textColor) = when (task.status) {
                 "Not Started" -> R.drawable.status_background_not_started to R.color.status_not_started
-                "In Progress" -> R.drawable.status_background_in_progress to R.color.status_in_progress
-                "Completed" -> R.drawable.status_background_complete to R.color.status_completed
+                "In progress" -> R.drawable.status_background_in_progress to R.color.status_in_progress
+                "Complete" -> R.drawable.status_background_complete to R.color.status_completed
                 else -> R.drawable.status_background_not_started to R.color.status_not_started
             }
             statusText.setBackgroundResource(backgroundColor)
@@ -95,8 +95,8 @@ class GroupedTaskAdapter(
             popup.setOnMenuItemClickListener { menuItem ->
                 val newStatus = when (menuItem.itemId) {
                     R.id.status_not_started -> "Not Started"
-                    R.id.status_in_progress -> "In Progress"
-                    R.id.status_completed -> "Completed"
+                    R.id.status_in_progress -> "In progress"
+                    R.id.status_completed -> "Complete"
                     else -> ""
                 }
                 if (newStatus.isNotEmpty()) {

@@ -5,7 +5,6 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.example.assignmate.databinding.ActivityForgetPasswordBinding
-import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 
 class ForgetPasswordActivity : AppCompatActivity() {
@@ -22,11 +21,10 @@ class ForgetPasswordActivity : AppCompatActivity() {
 
         binding.saveButton.setOnClickListener {
             val email = binding.email.text.toString().trim()
-            val oldPassword = binding.oldPassword.text.toString().trim()
             val newPassword = binding.newPassword.text.toString().trim()
             val confirmNewPassword = binding.confirmNewPassword.text.toString().trim()
 
-            if (email.isEmpty() || oldPassword.isEmpty() || newPassword.isEmpty() || confirmNewPassword.isEmpty()) {
+            if (email.isEmpty() || newPassword.isEmpty() || confirmNewPassword.isEmpty()) {
                 Toast.makeText(this, "Please fill all fields", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
@@ -41,26 +39,17 @@ class ForgetPasswordActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            // Sign in with old password to re-authenticate
-            auth.signInWithEmailAndPassword(email, oldPassword)
-                .addOnCompleteListener { signInTask ->
-                    if (signInTask.isSuccessful) {
-                        // If sign in is successful, update the password
-                        signInTask.result.user?.updatePassword(newPassword)
-                            ?.addOnCompleteListener { updateTask ->
-                                if (updateTask.isSuccessful) {
-                                    Toast.makeText(this, "Password updated successfully", Toast.LENGTH_SHORT).show()
-                                    // Sign out the user after password update to force re-login
-                                    auth.signOut()
-                                    startActivity(Intent(this, LoginActivity::class.java))
-                                    finish()
-                                } else {
-                                    Toast.makeText(this, "Failed to update password: ${updateTask.exception?.message}", Toast.LENGTH_SHORT).show()
-                                }
-                            }
+            // Send password reset email
+            auth.sendPasswordResetEmail(email)
+                .addOnCompleteListener { task ->
+                    if (task.isSuccessful) {
+                        Toast.makeText(this, "Password reset email sent to $email", Toast.LENGTH_SHORT).show()
+                        // Sign out and redirect to login
+                        auth.signOut()
+                        startActivity(Intent(this, LoginActivity::class.java))
+                        finish()
                     } else {
-                        // Sign in failed, likely wrong email or old password
-                        Toast.makeText(this, "Authentication failed: Invalid email or password", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, "Failed to send reset email: ${task.exception?.message}", Toast.LENGTH_SHORT).show()
                     }
                 }
         }

@@ -4,10 +4,16 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
+import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
 import android.text.Editable
+import android.text.Spannable
+import android.text.SpannableString
 import android.text.TextWatcher
+import android.text.style.ForegroundColorSpan
+import android.text.style.StyleSpan
 import android.view.View
 import android.widget.EditText
 import android.widget.ImageButton
@@ -126,11 +132,31 @@ class MainActivity : AppCompatActivity() {
 
         firebaseHelper.getUserDetails(currentUserId,
             onSuccess = {
-                if (it != null) {
-                    binding.welcomeMessage.text = "Welcome back, ${it.username}!"
-                } else {
-                    binding.welcomeMessage.text = "Welcome back, User!"
-                }
+                val username = it?.username ?: "User"
+                val welcomeText = "Welcome back, $username!"
+                val spannableString = SpannableString(welcomeText)
+                
+                // Calculate start and end indices of the username
+                val startIndex = welcomeText.indexOf(username)
+                val endIndex = startIndex + username.length
+
+                // Apply the color span
+                spannableString.setSpan(
+                    ForegroundColorSpan(Color.parseColor("#6DBE45")),
+                    startIndex,
+                    endIndex,
+                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+
+                // Apply the bold style span
+                spannableString.setSpan(
+                    StyleSpan(Typeface.BOLD),
+                    startIndex,
+                    endIndex,
+                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+                
+                binding.welcomeMessage.text = spannableString
             },
             onFailure = {
                 binding.welcomeMessage.text = "Welcome back, User!"

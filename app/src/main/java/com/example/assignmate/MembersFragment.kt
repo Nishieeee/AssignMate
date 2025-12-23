@@ -47,7 +47,7 @@ class MembersFragment : Fragment() {
         firebaseHelper.getGroupMembers(groupId,
             onSuccess = {
                 val currentUser = it.find { member -> member.id == currentUserId }
-                memberAdapter = MembersAdapter(it, currentUser?.role ?: "member") { member, action ->
+                memberAdapter = MembersAdapter(it, currentUser?.role ?: "member", currentUserId) { member, action ->
                     handleMemberAction(member, action)
                 }
                 membersRecyclerView.adapter = memberAdapter

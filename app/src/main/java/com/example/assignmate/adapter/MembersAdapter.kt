@@ -1,5 +1,6 @@
 package com.example.assignmate.adapter
 
+import android.graphics.Color
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -13,6 +14,7 @@ import com.example.assignmate.model.Member
 class MembersAdapter(
     private val members: List<Member>,
     private val currentUserRole: String,
+    private val currentUserId: String,
     private val onMemberActionListener: (Member, String) -> Unit
 ) : RecyclerView.Adapter<MembersAdapter.MemberViewHolder>() {
 
@@ -23,14 +25,23 @@ class MembersAdapter(
 
     override fun onBindViewHolder(holder: MemberViewHolder, position: Int) {
         val member = members[position]
-        holder.bind(member)
+        holder.bind(member, member.id == currentUserId)
 
-        if (currentUserRole == "leader" && member.role != "leader") {
+        // Rule 1: Do not show menu if the member is the current user
+        if (member.id == currentUserId) {
+            holder.memberActionsButton.visibility = View.GONE
+            return
+        }
+
+        // Rule 2: Logic for showing the menu based on roles
+        if (currentUserRole == "leader") {
+            // Leader can manage everyone else
             holder.memberActionsButton.visibility = View.VISIBLE
             holder.memberActionsButton.setOnClickListener { view ->
                 showPopupMenu(view, member)
             }
         } else {
+            // Co-leaders and regular members cannot manage anyone
             holder.memberActionsButton.visibility = View.GONE
         }
     }
@@ -39,6 +50,7 @@ class MembersAdapter(
         val popup = PopupMenu(view.context, view)
         popup.menuInflater.inflate(R.menu.member_actions_menu, popup.menu)
 
+        // Configure menu items based on role
         if (member.role == "co-leader") {
             popup.menu.findItem(R.id.action_assign_co_leader).title = "Remove as Co-Leader"
         } else {
@@ -68,7 +80,7 @@ class MembersAdapter(
         private val memberName: TextView = itemView.findViewById(R.id.member_name)
         val memberActionsButton: ImageButton = itemView.findViewById(R.id.member_actions_button)
 
-        fun bind(member: Member) {
+        fun bind(member: Member, isCurrentUser: Boolean) {
             var name = member.name
             if (member.role == "leader") {
                 name += " (Leader)"
@@ -76,6 +88,13 @@ class MembersAdapter(
                 name += " (Co-Leader)"
             }
             memberName.text = name
+            
+            if (isCurrentUser) {
+                memberName.setTextColor(Color.parseColor("#6DBE45"))
+            } else {
+                // Reset to default color (e.g., black) for other items to avoid recycling issues
+                memberName.setTextColor(Color.BLACK) 
+            }
         }
     }
 }

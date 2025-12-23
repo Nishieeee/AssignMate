@@ -1,5 +1,6 @@
 package com.example.assignmate.adapter
 
+import android.graphics.Color
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import android.widget.PopupMenu
@@ -56,15 +57,6 @@ class GroupAdapter(
             }
         }
         
-        // Sorting logic based on filterType if needed, but for now sorting is not explicitly requested other than filtering
-        // The original logic had sorting options in the dropdown text, let's respect that if they were combined
-        // But the prompt asked for filtering by Leader vs Member.
-        // If the dropdown also includes sort options like "Date Created", we should handle them.
-        // Based on GroupActivity.kt: "All", "Favourite", "Date Created", "Last Updated", "Most Tasks Assigned"
-        // Wait, I replaced the dropdown options in GroupActivity.kt in the previous turn.
-        // The new options are: "All", "Leader", "Co-leader/Member", "Favourite".
-        // So I don't need to handle sorting here anymore unless requested.
-
         groups.clear()
         groups.addAll(filteredList)
         notifyDataSetChanged()
@@ -86,6 +78,16 @@ class GroupAdapter(
             binding.groupDescription.text = group.description
             binding.lastUpdated.text = "Last updated: ${SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(group.lastUpdated))}"
             binding.groupProgress.progress = group.progress
+            
+            val role = group.members[currentUserId] ?: "Member"
+            val displayRole = role.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
+            binding.userRole.text = "Role: $displayRole"
+            
+            when (role.lowercase(Locale.getDefault())) {
+                "leader" -> binding.userRole.setTextColor(Color.parseColor("#6DBE45"))
+                "co-leader" -> binding.userRole.setTextColor(Color.parseColor("#F28A30"))
+                else -> binding.userRole.setTextColor(Color.BLACK)
+            }
             
             if (group.profileImage.isNotEmpty()) {
                 Glide.with(binding.root.context)

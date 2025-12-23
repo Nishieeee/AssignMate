@@ -5,8 +5,8 @@
         android:title="Not Started" />
     <item
         android:id="@+id/status_in_progress"
-        android:title="In Progress" />
+        android:title="In progress" />
     <item
         android:id="@+id/status_completed"
-        android:title="Completed" />
+        android:title="Complete" />
 </menu>
