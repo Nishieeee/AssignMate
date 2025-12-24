@@ -16,10 +16,33 @@ class LoginActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        auth = FirebaseAuth.getInstance()
+        
+        // Remove onStart auth check logic from here or simplify it, 
+        // but since Introduction activity now handles the "initial launch" logic,
+        // LoginActivity is reached only if user is NOT logged in or has completed introduction.
+        // However, if the user explicitly launched LoginActivity but is already logged in,
+        // we should probably still redirect them to MainActivity.
+        // The user said: "if a user is signed in, it should open activity_main.xml".
+        // The Introduction activity already checks for signed-in user and redirects to MainActivity.
+        // If we fall through to LoginActivity, it means either:
+        // 1. We came from Introduction (user not signed in, first run done)
+        // 2. We came from Introduction (user not signed in, first run just finished)
+        // 3. We opened app and Introduction redirected us here because not signed in + first run done.
+        
+        // So checking auth here again is safe and good practice.
+
+        if (auth.currentUser != null) {
+            val intent = Intent(this, MainActivity::class.java)
+            intent.putExtra("USER_ID", auth.currentUser!!.uid)
+            startActivity(intent)
+            finish()
+            return
+        }
+
         binding = ActivityLoginBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        auth = FirebaseAuth.getInstance()
         firebaseHelper = FirebaseHelper()
 
         binding.login.setOnClickListener {
@@ -50,16 +73,6 @@ class LoginActivity : AppCompatActivity() {
 
         binding.forgotPassword.setOnClickListener {
             startActivity(Intent(this, ForgetPasswordActivity::class.java))
-        }
-    }
-
-    override fun onStart() {
-        super.onStart()
-        if (auth.currentUser != null) {
-            val intent = Intent(this, MainActivity::class.java)
-            intent.putExtra("USER_ID", auth.currentUser!!.uid)
-            startActivity(intent)
-            finish()
         }
     }
 }
