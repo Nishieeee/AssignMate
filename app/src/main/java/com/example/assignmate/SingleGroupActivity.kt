@@ -29,6 +29,7 @@ import com.example.assignmate.adapter.LabelAdapter
 import com.example.assignmate.databinding.ActivitySingleGroupBinding
 import com.example.assignmate.model.Group
 import com.example.assignmate.model.Label
+import com.example.assignmate.model.Notification
 import com.example.assignmate.model.Subtask
 import com.example.assignmate.model.Task
 import com.google.android.material.tabs.TabLayoutMediator
@@ -186,9 +187,18 @@ class SingleGroupActivity : AppCompatActivity() {
     override fun onPrepareOptionsMenu(menu: Menu?): Boolean {
         val canManageGroup = currentUserRole == "leader" || currentUserRole == "co-leader"
         menu?.findItem(R.id.action_edit_group)?.isVisible = canManageGroup
-        menu?.findItem(R.id.action_delete_group)?.isVisible = canManageGroup
         menu?.findItem(R.id.action_manage_labels)?.isVisible = canManageGroup
         menu?.findItem(R.id.action_add_members)?.isVisible = canManageGroup
+        
+        // Show "Delete Group" only for leader, otherwise show "Leave Group"
+        val deleteItem = menu?.findItem(R.id.action_delete_group)
+        if (currentUserRole == "leader") {
+             deleteItem?.title = "Delete Group"
+             deleteItem?.isVisible = true
+        } else {
+             deleteItem?.title = "Leave Group"
+             deleteItem?.isVisible = true
+        }
         
         val favoriteItem = menu?.findItem(R.id.action_add_to_favorites)
         if (isFavorite) {
@@ -205,7 +215,13 @@ class SingleGroupActivity : AppCompatActivity() {
             android.R.id.home -> finish()
             R.id.action_add_to_favorites -> toggleFavoriteStatus()
             R.id.action_edit_group -> showEditGroupDialog()
-            R.id.action_delete_group -> showDeleteGroupDialog()
+            R.id.action_delete_group -> {
+                if (currentUserRole == "leader") {
+                    showDeleteGroupDialog()
+                } else {
+                    showLeaveGroupDialog()
+                }
+            }
             R.id.action_add_members -> showAddMembersDialog()
             R.id.action_manage_labels -> showManageLabelsDialog()
             else -> return super.onOptionsItemSelected(item)
@@ -382,6 +398,25 @@ class SingleGroupActivity : AppCompatActivity() {
             .show()
     }
 
+    private fun showLeaveGroupDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Leave Group")
+            .setMessage("Are you sure you want to leave this group?")
+            .setPositiveButton("Leave") { _, _ ->
+                firebaseHelper.removeMemberFromGroup(groupId, currentUserId,
+                    onSuccess = {
+                        Toast.makeText(this, "You left the group", Toast.LENGTH_SHORT).show()
+                        finish()
+                    },
+                    onFailure = {
+                        Toast.makeText(this, "Failed to leave group", Toast.LENGTH_SHORT).show()
+                    }
+                )
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
     private fun showAddMembersDialog() {
         val builder = AlertDialog.Builder(this)
         val view = layoutInflater.inflate(R.layout.dialog_add_member, null)
@@ -412,6 +447,15 @@ class SingleGroupActivity : AppCompatActivity() {
                         firebaseHelper.updateMemberRole(groupId, user.id, "member",
                             onSuccess = {
                                 Toast.makeText(this, "Member added successfully", Toast.LENGTH_SHORT).show()
+                                
+                                // Send notification to the user
+                                val notification = Notification(
+                                    userId = user.id,
+                                    message = "You have been added to the group '$groupName'",
+                                    timestamp = System.currentTimeMillis()
+                                )
+                                firebaseHelper.addNotification(notification, {}, {})
+
                                 val membersFragment = supportFragmentManager.fragments.find { it is MembersFragment } as? MembersFragment
                                 membersFragment?.loadMembers()
                             },
@@ -434,8 +478,6 @@ class SingleGroupActivity : AppCompatActivity() {
     }
 
     private fun showCreateTaskDialog() {
-        // ... (Same implementation as before, abbreviated for brevity as no changes needed here but I must include it if I rewrite the file)
-        // I will use the previous implementation to ensure consistency.
         val builder = AlertDialog.Builder(this)
         val view = layoutInflater.inflate(R.layout.dialog_create_task, null)
         builder.setView(view)
@@ -444,16 +486,6 @@ class SingleGroupActivity : AppCompatActivity() {
         val taskNameInput = view.findViewById<EditText>(R.id.task_name_input)
         val taskDescriptionInput = view.findViewById<EditText>(R.id.task_description_input)
         val dueDateInput = view.findViewById<EditText>(R.id.due_date_input)
-        // ... rest of dialog logic ...
-        // Since I'm using write_file for the whole file, I must reconstruct it.
-        // It's long. I should have used replace_text maybe?
-        // But write_file is safer if I want to ensure structure.
-        // I will paste the original logic back.
-        // Wait, the original `showCreateTaskDialog` was quite long.
-        // I'll do my best to replicate it exactly or close to it.
-        
-        // Actually, to be safe and accurate, I'll copy the logic from the `read_file` output I got earlier.
-        
         val assignToLayout = view.findViewById<View>(R.id.assign_to_layout)
         val assignedMembersChipGroup = view.findViewById<com.google.android.material.chip.ChipGroup>(R.id.assigned_members_chip_group)
         val addLabelLayout = view.findViewById<View>(R.id.add_label_layout)

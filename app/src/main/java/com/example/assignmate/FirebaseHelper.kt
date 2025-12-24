@@ -203,13 +203,22 @@ class FirebaseHelper {
     }
 
     fun deleteGroup(groupId: String, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
-        groupsCollection.document(groupId).delete()
-            .addOnSuccessListener {
-                onSuccess()
+        // First delete all tasks associated with the group
+        tasksCollection.whereEqualTo("groupId", groupId).get()
+            .addOnSuccessListener { querySnapshot ->
+                val batch = db.batch()
+                for (document in querySnapshot.documents) {
+                    batch.delete(document.reference)
+                }
+                // Also delete the group document
+                val groupRef = groupsCollection.document(groupId)
+                batch.delete(groupRef)
+
+                batch.commit()
+                    .addOnSuccessListener { onSuccess() }
+                    .addOnFailureListener { e -> onFailure(e) }
             }
-            .addOnFailureListener { e ->
-                onFailure(e)
-            }
+            .addOnFailureListener { e -> onFailure(e) }
     }
 
     fun setFavourite(groupId: String, userId: String, isFavourite: Boolean, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
@@ -480,28 +489,50 @@ class FirebaseHelper {
 
     fun removeMemberFromGroup(groupId: String, userId: String, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
         val currentActorId = auth.currentUser?.uid ?: ""
-        getUserDetails(userId, { removedUser ->
-            getGroup(groupId, { group ->
-                getUserDetails(currentActorId, { actor ->
-                    if (group != null && removedUser != null) {
-                        val title = if (userId == currentActorId) "Member Left" else "Member Removed"
-                        val action = if (userId == currentActorId) "left" else "was removed from"
-                        val byText = if (userId != currentActorId) " by ${actor?.username}" else ""
+        
+        // Find tasks in this group assigned to this user
+        tasksCollection.whereEqualTo("groupId", groupId).get()
+            .addOnSuccessListener { querySnapshot ->
+                val batch = db.batch()
+                
+                // Update tasks to remove user from assignedTo
+                for (document in querySnapshot.documents) {
+                     val task = document.toObject(Task::class.java)
+                     if (task != null && task.assignedTo.contains(userId)) {
+                         batch.update(document.reference, "assignedTo", FieldValue.arrayRemove(userId))
+                     }
+                }
+                
+                // Remove member from group
+                val groupRef = groupsCollection.document(groupId)
+                batch.update(groupRef, "members.$userId", FieldValue.delete())
+                
+                batch.commit()
+                    .addOnSuccessListener { 
+                        // Notification logic
+                        getUserDetails(userId, { removedUser ->
+                            getGroup(groupId, { group ->
+                                getUserDetails(currentActorId, { actor ->
+                                    if (group != null && removedUser != null) {
+                                        val title = if (userId == currentActorId) "Member Left" else "Member Removed"
+                                        val action = if (userId == currentActorId) "left" else "was removed from"
+                                        val byText = if (userId != currentActorId && actor != null) " by ${actor.username}" else ""
+                                        
+                                        notifyLeaders(
+                                            groupId = groupId,
+                                            title = title,
+                                            content = "${removedUser.username} $action ${group.name}$byText",
+                                            excludeUserId = currentActorId
+                                        )
+                                    }
+                                }, {})
+                            }, {})
+                        }, {})
                         
-                        notifyLeaders(
-                            groupId = groupId,
-                            title = title,
-                            content = "${removedUser.username} $action ${group.name}$byText",
-                            excludeUserId = currentActorId
-                        )
+                        onSuccess() 
                     }
-                }, {})
-            }, {})
-        }, {})
-
-        val updates = mapOf("members.$userId" to FieldValue.delete())
-        groupsCollection.document(groupId).update(updates)
-            .addOnSuccessListener { onSuccess() }
+                    .addOnFailureListener { e -> onFailure(e) }
+            }
             .addOnFailureListener { e -> onFailure(e) }
     }
 

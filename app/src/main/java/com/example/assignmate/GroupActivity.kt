@@ -133,6 +133,9 @@ class GroupActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItem
             onDeleteClicked = { group ->
                 showDeleteGroupConfirmationDialog(group)
             },
+            onLeaveClicked = { group ->
+                showLeaveGroupConfirmationDialog(group)
+            },
             onFavouriteClicked = { group ->
                 val isFavourite = group.favouriteBy.contains(currentUserId)
                 firebaseHelper.setFavourite(group.id, currentUserId, !isFavourite, {
@@ -472,6 +475,25 @@ class GroupActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItem
                     },
                     onFailure = {
                         Toast.makeText(this, "Failed to delete group", Toast.LENGTH_SHORT).show()
+                    }
+                )
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showLeaveGroupConfirmationDialog(group: Group) {
+        AlertDialog.Builder(this)
+            .setTitle("Leave Group")
+            .setMessage("Are you sure you want to leave \"${group.name}\"?")
+            .setPositiveButton("Leave") { _, _ ->
+                firebaseHelper.removeMemberFromGroup(group.id, currentUserId,
+                    onSuccess = {
+                        Toast.makeText(this, "You left the group", Toast.LENGTH_SHORT).show()
+                        loadGroups()
+                    },
+                    onFailure = {
+                        Toast.makeText(this, "Failed to leave group", Toast.LENGTH_SHORT).show()
                     }
                 )
             }

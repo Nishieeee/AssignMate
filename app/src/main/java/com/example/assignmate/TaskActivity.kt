@@ -66,7 +66,7 @@ class TaskActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItemS
             }
         })
 
-        val filterOptions = arrayOf("All", "In progress", "Completed")
+        val filterOptions = arrayOf("All", "In progress")
         val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, filterOptions)
         binding.filterDropdown.setAdapter(adapter)
         binding.filterDropdown.setOnItemClickListener { _, _, position, _ ->
@@ -150,13 +150,14 @@ class TaskActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItemS
 
     private fun displayTasks(tasks: List<Task>) {
         binding.progressBar.visibility = View.GONE
-        if (tasks.isEmpty()) {
+        
+        val groupedTasks = groupTasks(tasks)
+        if (groupedTasks.isEmpty()) {
             binding.emptyView.visibility = View.VISIBLE
             binding.tasksRecyclerView.visibility = View.GONE
         } else {
             binding.emptyView.visibility = View.GONE
             binding.tasksRecyclerView.visibility = View.VISIBLE
-            val groupedTasks = groupTasks(tasks)
             adapter.submitList(groupedTasks)
         }
     }
@@ -171,11 +172,16 @@ class TaskActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItemS
         }
         val tomorrowStart = (todayStart.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, 1) }
 
-        val overdueTasks = tasks.filter { it.dueDate != 0L && it.dueDate < todayStart.timeInMillis && it.status != "Completed" }
-        val todayTasks = tasks.filter { it.dueDate >= todayStart.timeInMillis && it.dueDate < tomorrowStart.timeInMillis && it.status != "Completed" }
-        val upcomingTasks = tasks.filter { it.dueDate >= tomorrowStart.timeInMillis && it.status != "Completed" }
-        val noDateTasks = tasks.filter { it.dueDate == 0L && it.status != "Completed" }
-        val completedTasks = tasks.filter { it.status == "Completed" }
+        // Filter out completed tasks (case-insensitive)
+        val activeTasks = tasks.filter {
+            !it.status.equals("Complete", ignoreCase = true) &&
+            !it.status.equals("Completed", ignoreCase = true)
+        }
+
+        val overdueTasks = activeTasks.filter { it.dueDate != 0L && it.dueDate < todayStart.timeInMillis }
+        val todayTasks = activeTasks.filter { it.dueDate >= todayStart.timeInMillis && it.dueDate < tomorrowStart.timeInMillis }
+        val upcomingTasks = activeTasks.filter { it.dueDate >= tomorrowStart.timeInMillis }
+        val noDateTasks = activeTasks.filter { it.dueDate == 0L }
 
         if (overdueTasks.isNotEmpty()) {
             listItems.add(GroupedTaskAdapter.TaskListItem.Header("Overdue"))
@@ -200,10 +206,6 @@ class TaskActivity : AppCompatActivity(), BottomNavigationView.OnNavigationItemS
         if (noDateTasks.isNotEmpty()) {
             listItems.add(GroupedTaskAdapter.TaskListItem.Header("No Date"))
             listItems.addAll(noDateTasks.map { GroupedTaskAdapter.TaskListItem.TaskItem(it) })
-        }
-        if (completedTasks.isNotEmpty()) {
-            listItems.add(GroupedTaskAdapter.TaskListItem.Header("Completed"))
-            listItems.addAll(completedTasks.sortedByDescending { it.dueDate }.map { GroupedTaskAdapter.TaskListItem.TaskItem(it) })
         }
 
         return listItems

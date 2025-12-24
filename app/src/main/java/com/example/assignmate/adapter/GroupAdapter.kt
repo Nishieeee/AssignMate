@@ -19,6 +19,7 @@ class GroupAdapter(
     private val onGroupClicked: (Group) -> Unit,
     private val onEditClicked: (Group) -> Unit,
     private val onDeleteClicked: (Group) -> Unit,
+    private val onLeaveClicked: (Group) -> Unit,
     private val onFavouriteClicked: (Group) -> Unit,
     private val getUsername: (String, (String) -> Unit) -> Unit
 ) : RecyclerView.Adapter<GroupAdapter.GroupViewHolder>() {
@@ -111,6 +112,13 @@ class GroupAdapter(
                 val isFavourite = group.favouriteBy.contains(currentUserId)
                 popup.menu.findItem(R.id.action_add_to_favourite).title = if (isFavourite) "Remove from Favourites" else "Add to Favourites"
 
+                val deleteItem = popup.menu.findItem(R.id.action_delete_group)
+                if (role == "leader") {
+                    deleteItem.title = "Delete Group"
+                } else {
+                    deleteItem.title = "Leave Group"
+                }
+
                 popup.setOnMenuItemClickListener { menuItem ->
                     when (menuItem.itemId) {
                         R.id.action_edit_group -> {
@@ -118,7 +126,11 @@ class GroupAdapter(
                             true
                         }
                         R.id.action_delete_group -> {
-                            onDeleteClicked(group)
+                            if (role == "leader") {
+                                onDeleteClicked(group)
+                            } else {
+                                onLeaveClicked(group)
+                            }
                             true
                         }
                         R.id.action_add_to_favourite -> {
