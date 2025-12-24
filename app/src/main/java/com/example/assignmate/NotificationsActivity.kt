@@ -135,7 +135,6 @@ class NotificationsActivity : AppCompatActivity() {
         } else {
             binding.normalToolbarLayout.visibility = View.VISIBLE
             binding.selectionToolbarLayout.visibility = View.GONE
-            notificationAdapter.clearSelections()
         }
     }
 

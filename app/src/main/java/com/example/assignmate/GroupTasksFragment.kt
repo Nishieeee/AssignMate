@@ -53,7 +53,8 @@ class GroupTasksFragment : Fragment() {
     fun displayTasks(tasks: List<Task>) {
         val currentUserId = (activity as? SingleGroupActivity)?.intent?.getStringExtra("USER_ID") ?: ""
         if (isAdded) {
-            taskAdapter = TaskAdapter(tasks.toMutableList(),
+            // Updated to pass List<Task> to constructor. TaskAdapter now handles grouping.
+            taskAdapter = TaskAdapter(tasks,
                 onTaskClick = { task ->
                     val intent = Intent(requireContext(), TaskDetailActivity::class.java).apply {
                         putExtra("TASK_ID", task.uid)

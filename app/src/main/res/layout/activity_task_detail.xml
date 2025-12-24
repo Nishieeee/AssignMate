@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/white"
+    android:background="#FFF8F0"
     tools:context=".TaskDetailActivity">
 
     <com.google.android.material.appbar.AppBarLayout
@@ -29,6 +29,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:background="#FFF8F0"
             android:orientation="vertical"
             android:padding="16dp">
 
@@ -36,7 +37,7 @@
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Task Title">
+                android:hint="@string/task_title_hint">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/task_title_input"
@@ -49,7 +50,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
-                android:hint="Description">
+                android:hint="@string/task_description_hint">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/task_description_input"
@@ -71,12 +72,14 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:hint="Status">
+                    android:hint="@string/task_status_hint">
 
                     <AutoCompleteTextView
                         android:id="@+id/status_dropdown"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content" />
+                        android:layout_height="wrap_content"
+                        android:inputType="none"
+                        tools:ignore="LabelFor" />
 
                 </com.google.android.material.textfield.TextInputLayout>
 
@@ -86,12 +89,14 @@
                     android:layout_height="wrap_content"
                     android:layout_marginStart="8dp"
                     android:layout_weight="1"
-                    android:hint="Due Date">
+                    android:hint="@string/task_due_date_hint">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/due_date_input"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content" />
+                        android:layout_height="wrap_content"
+                        android:clickable="true"
+                        android:focusable="false" />
                 </com.google.android.material.textfield.TextInputLayout>
             </LinearLayout>
 
@@ -108,6 +113,7 @@
                     android:layout_height="24dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:clickable="true"
+                    android:contentDescription="@string/icon_desc"
                     android:focusable="true"
                     android:src="@drawable/ic_person"
                     app:tint="?attr/colorControlNormal" />
@@ -116,14 +122,14 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="8dp"
-                    android:text="Assign to"
+                    android:text="@string/assign_to_label"
                     android:textAppearance="?attr/textAppearanceBody1" />
 
                 <HorizontalScrollView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
                     android:layout_marginStart="8dp"
+                    android:layout_weight="1"
                     android:scrollbars="none">
 
                     <com.google.android.material.chip.ChipGroup
@@ -147,6 +153,7 @@
                     android:layout_height="24dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:clickable="true"
+                    android:contentDescription="@string/icon_desc"
                     android:focusable="true"
                     android:src="@drawable/ic_label"
                     app:tint="?attr/colorControlNormal" />
@@ -155,14 +162,14 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="8dp"
-                    android:text="Add Labels"
+                    android:text="@string/add_labels_label"
                     android:textAppearance="?attr/textAppearanceBody1" />
 
                 <HorizontalScrollView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
                     android:layout_marginStart="8dp"
+                    android:layout_weight="1"
                     android:scrollbars="none">
 
                     <com.google.android.material.chip.ChipGroup
@@ -173,12 +180,62 @@
 
             </LinearLayout>
 
-            <TextView
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="24dp"
-                android:text="Subtasks"
-                android:textAppearance="?attr/textAppearanceHeadline6" />
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/subtasks_label"
+                    android:textAppearance="?attr/textAppearanceHeadline6" />
+
+                <ImageButton
+                    android:id="@+id/delete_subtasks_button"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/icon_desc"
+                    android:src="@drawable/ic_delete"
+                    app:tint="?attr/colorError" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/delete_subtasks_actions_layout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="end"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <Button
+                    android:id="@+id/btn_cancel_subtask_delete"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/cancel_button"
+                    android:textColor="?attr/colorPrimary" />
+
+                <Button
+                    android:id="@+id/btn_delete_selected_subtasks"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/delete_button"
+                    android:textColor="?attr/colorError" />
+
+                <Button
+                    android:id="@+id/btn_delete_all_subtasks"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/delete_all_button"
+                    android:textColor="?attr/colorError" />
+            </LinearLayout>
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/subtasks_recycler_view"
@@ -193,28 +250,29 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="end"
-                android:text="Add Subtask" />
+                android:text="@string/add_subtask_button" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Comments"
+                    android:text="@string/comments_label"
                     android:textAppearance="?attr/textAppearanceHeadline6" />
 
                 <ImageButton
                     android:id="@+id/delete_comments_button"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:src="@drawable/ic_delete"
                     android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/icon_desc"
+                    android:src="@drawable/ic_delete"
                     app:tint="?attr/colorError" />
             </LinearLayout>
 
@@ -222,8 +280,8 @@
                 android:id="@+id/delete_actions_layout"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
                 android:gravity="end"
+                android:orientation="horizontal"
                 android:visibility="gone">
 
                 <Button
@@ -231,7 +289,7 @@
                     style="@style/Widget.MaterialComponents.Button.TextButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Cancel"
+                    android:text="@string/cancel_button"
                     android:textColor="?attr/colorPrimary" />
 
                 <Button
@@ -239,7 +297,7 @@
                     style="@style/Widget.MaterialComponents.Button.TextButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Delete"
+                    android:text="@string/delete_button"
                     android:textColor="?attr/colorError" />
 
                 <Button
@@ -247,7 +305,7 @@
                     style="@style/Widget.MaterialComponents.Button.TextButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Delete All"
+                    android:text="@string/delete_all_button"
                     android:textColor="?attr/colorError" />
             </LinearLayout>
 
@@ -268,7 +326,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal">
-                    
+
                     <!-- Previews will be added here dynamically -->
 
                 </LinearLayout>
@@ -279,23 +337,23 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:paddingBottom="8dp">
-                
+
                 <ImageButton
                     android:id="@+id/btn_attach_file"
                     android:layout_width="40dp"
                     android:layout_height="40dp"
                     android:layout_marginEnd="8dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
-                    android:src="@drawable/ic_attach_file"
-                    android:contentDescription="Attach File" />
+                    android:contentDescription="@string/attach_file_desc"
+                    android:src="@drawable/ic_attach_file" />
 
                 <ImageButton
                     android:id="@+id/btn_attach_image"
                     android:layout_width="40dp"
                     android:layout_height="40dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
-                    android:src="@drawable/ic_attach_image"
-                    android:contentDescription="Attach Image" />
+                    android:contentDescription="@string/attach_image_desc"
+                    android:src="@drawable/ic_attach_image" />
 
             </LinearLayout>
 
@@ -310,7 +368,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:hint="Add a comment">
+                    android:hint="@string/add_comment_hint">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/comment_input"
@@ -318,16 +376,14 @@
                         android:layout_height="wrap_content" />
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <ImageButton
+                <Button
                     android:id="@+id/add_comment_button"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="8dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:src="@drawable/ic_menu_send" />
+                    android:text="@string/post_comment_button" />
             </LinearLayout>
-
-
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 

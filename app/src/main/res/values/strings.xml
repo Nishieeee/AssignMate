@@ -11,4 +11,21 @@
     <string name="enter_your_email">Enter Your Email</string>
     <string name="loginbg">loginBG</string>
     <string name="userLogin">Login</string>
+    <string name="task_title_hint">Title</string>
+    <string name="task_description_hint">Description</string>
+    <string name="task_status_hint">Status</string>
+    <string name="task_due_date_hint">Due Date</string>
+    <string name="assign_to_label">Assign to</string>
+    <string name="add_labels_label">Add Labels</string>
+    <string name="subtasks_label">Subtasks</string>
+    <string name="comments_label">Comments</string>
+    <string name="cancel_button">Cancel</string>
+    <string name="delete_button">Delete</string>
+    <string name="delete_all_button">Delete All</string>
+    <string name="add_subtask_button">Add Subtask</string>
+    <string name="post_comment_button">Post</string>
+    <string name="attach_file_desc">Attach File</string>
+    <string name="attach_image_desc">Attach Image</string>
+    <string name="add_comment_hint">Add a comment</string>
+    <string name="icon_desc">Icon</string>
 </resources>

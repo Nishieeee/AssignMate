@@ -64,6 +64,9 @@ class TaskDetailActivity : AppCompatActivity() {
     // For deleting comments
     private var isCommentDeleteMode = false
     private var commentAdapter: CommentAdapter? = null
+    
+    // For deleting subtasks
+    private var isSubtaskDeleteMode = false
 
 
     private val attachFileLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -112,7 +115,12 @@ class TaskDetailActivity : AppCompatActivity() {
             onSuccess = { task ->
                 if (task != null) {
                     originalTask = task
-                    modifiedTask = task.copy()
+                    // Deep copy for modifiedTask to ensure checkForChanges works correctly with mutable lists
+                    modifiedTask = task.copy(
+                        subtasks = task.subtasks.map { it.copy() }.toMutableList(),
+                        assignedTo = task.assignedTo.toMutableList(),
+                        labels = task.labels.toMutableList()
+                    )
                     firebaseHelper.getGroup(task.groupId,
                         onSuccess = { group ->
                             currentUserRole = group?.members?.get(currentUserId)
@@ -147,15 +155,21 @@ class TaskDetailActivity : AppCompatActivity() {
         originalTask?.status?.let { setStatusColor(it) }
 
         val canManageTask = currentUserRole == "leader" || currentUserRole == "co-leader"
+        val isMemberOrLeader = currentUserRole != null
+
         binding.taskTitleInput.isFocusable = canManageTask
         binding.taskTitleInput.isFocusableInTouchMode = canManageTask
         binding.taskDescriptionInput.isFocusable = canManageTask
         binding.taskDescriptionInput.isFocusableInTouchMode = canManageTask
-        binding.statusDropdown.isEnabled = canManageTask
+        
+        binding.statusDropdown.isEnabled = isMemberOrLeader
+        
         binding.addAssigneeIcon.visibility = if (canManageTask) View.VISIBLE else View.GONE
         binding.addLabelIcon.visibility = if (canManageTask) View.VISIBLE else View.GONE
-        binding.addSubtaskButton.visibility = if (canManageTask) View.VISIBLE else View.GONE
-        binding.addSubtaskButton.isEnabled = canManageTask
+        
+        binding.addSubtaskButton.visibility = if (isMemberOrLeader) View.VISIBLE else View.GONE
+        binding.addSubtaskButton.isEnabled = isMemberOrLeader
+        binding.deleteSubtasksButton.visibility = if (isMemberOrLeader) View.VISIBLE else View.GONE
 
         if (originalTask?.dueDate != 0L) {
             originalTask?.dueDate?.let {
@@ -176,10 +190,11 @@ class TaskDetailActivity : AppCompatActivity() {
             firebaseHelper.getGroupMembers(it.groupId,
                 onSuccess = { members ->
                     val assignedMembers = members.filter { member -> modifiedTask?.assignedTo?.contains(member.id) == true }
+                    val canManageTask = currentUserRole == "leader" || currentUserRole == "co-leader"
                     for (member in assignedMembers) {
                         val chip = Chip(this)
                         chip.text = member.name
-                        chip.isCloseIconVisible = true
+                        chip.isCloseIconVisible = canManageTask
                         chip.setOnCloseIconClickListener {
                             (modifiedTask?.assignedTo as? MutableList)?.remove(member.id)
                             updateAssignedMembersChips()
@@ -198,11 +213,12 @@ class TaskDetailActivity : AppCompatActivity() {
         originalTask?.groupId?.let {
             firebaseHelper.getLabelsForGroup(it, {
                 val selectedLabels = it.filter { label -> modifiedTask?.labels?.contains(label.id) == true }
+                val canManageTask = currentUserRole == "leader" || currentUserRole == "co-leader"
                 for (label in selectedLabels) {
                     val chip = Chip(this)
                     chip.text = label.name
                     chip.chipBackgroundColor = ColorStateList.valueOf(Color.parseColor(label.color))
-                    chip.isCloseIconVisible = true
+                    chip.isCloseIconVisible = canManageTask
                     chip.setOnCloseIconClickListener {
                         (modifiedTask?.labels as? MutableList)?.remove(label.id)
                         updateLabelChips()
@@ -223,6 +239,8 @@ class TaskDetailActivity : AppCompatActivity() {
     }
 
     private fun setupListeners() {
+        // Removed FAB listener
+
         binding.taskTitleInput.addTextChangedListener(textWatcher)
         binding.taskDescriptionInput.addTextChangedListener(textWatcher)
 
@@ -359,6 +377,60 @@ class TaskDetailActivity : AppCompatActivity() {
                 .setNegativeButton("Cancel", null)
                 .show()
         }
+        
+        // Subtask Delete Listeners
+        binding.deleteSubtasksButton.setOnClickListener {
+            if (isSubtaskDeleteMode) {
+                exitSubtaskDeleteMode()
+            } else {
+                isSubtaskDeleteMode = true
+                subtaskAdapter.setDeleteMode(true)
+                binding.deleteSubtasksButton.visibility = View.GONE
+                binding.deleteSubtasksActionsLayout.visibility = View.VISIBLE
+            }
+        }
+
+        binding.btnCancelSubtaskDelete.setOnClickListener {
+            exitSubtaskDeleteMode()
+        }
+
+        binding.btnDeleteSelectedSubtasks.setOnClickListener {
+            val selectedSubtasks = subtaskAdapter.getSelectedSubtasks()
+            if (selectedSubtasks.isEmpty()) {
+                Toast.makeText(this, "No subtasks selected", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            AlertDialog.Builder(this)
+                .setTitle("Delete Subtasks")
+                .setMessage("Are you sure you want to delete ${selectedSubtasks.size} subtask(s)?")
+                .setPositiveButton("Delete") { _, _ ->
+                    subtaskAdapter.removeSubtasks(selectedSubtasks)
+                    exitSubtaskDeleteMode()
+                    checkForChanges()
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        }
+
+        binding.btnDeleteAllSubtasks.setOnClickListener {
+            val allSubtasks = subtaskAdapter.getAllSubtasks()
+            if (allSubtasks.isEmpty()) {
+                 Toast.makeText(this, "No subtasks to delete", Toast.LENGTH_SHORT).show()
+                 return@setOnClickListener
+            }
+
+            AlertDialog.Builder(this)
+                .setTitle("Delete All Subtasks")
+                .setMessage("Are you sure you want to delete ALL subtasks?")
+                .setPositiveButton("Delete All") { _, _ ->
+                    subtaskAdapter.removeSubtasks(allSubtasks)
+                    exitSubtaskDeleteMode()
+                    checkForChanges()
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        }
     }
 
     private fun exitDeleteMode() {
@@ -366,6 +438,13 @@ class TaskDetailActivity : AppCompatActivity() {
         commentAdapter?.setDeleteMode(false)
         binding.deleteCommentsButton.visibility = View.VISIBLE
         binding.deleteActionsLayout.visibility = View.GONE
+    }
+    
+    private fun exitSubtaskDeleteMode() {
+        isSubtaskDeleteMode = false
+        subtaskAdapter.setDeleteMode(false)
+        binding.deleteSubtasksButton.visibility = View.VISIBLE
+        binding.deleteSubtasksActionsLayout.visibility = View.GONE
     }
 
     private val textWatcher = object : TextWatcher {
@@ -547,7 +626,6 @@ class TaskDetailActivity : AppCompatActivity() {
 
             if (subtaskName.isNotEmpty()) {
                 val subtask = Subtask(name = subtaskName)
-                (modifiedTask?.subtasks as? MutableList)?.add(subtask)
                 subtaskAdapter.addSubtask(subtask)
                 checkForChanges()
             } else {
@@ -634,7 +712,6 @@ class TaskDetailActivity : AppCompatActivity() {
                         binding.commentsRecyclerView.adapter = commentAdapter
                     },
                     onFailure = {
-                        // Fallback to original comments if user fetch fails
                         val sortedComments = comments.sortedBy { it.timestamp }
                         binding.commentsRecyclerView.layoutManager = LinearLayoutManager(this)
                         commentAdapter = CommentAdapter(sortedComments, isDeleteMode = isCommentDeleteMode)
@@ -714,14 +791,12 @@ class TaskDetailActivity : AppCompatActivity() {
         val fileNameView = previewView.findViewById<TextView>(R.id.file_name)
         val fileSizeView = previewView.findViewById<TextView>(R.id.file_size)
 
-        // Get file info
         var filename = "unknown_file"
         var size = 0L
         val contentResolver = contentResolver
         val mimeType = contentResolver.getType(uri)
         val isImage = mimeType?.startsWith("image/") == true
 
-        // Query metadata
         contentResolver.query(uri, null, null, null, null)?.use { cursor ->
             val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
             val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
@@ -732,15 +807,11 @@ class TaskDetailActivity : AppCompatActivity() {
         }
 
         if (isImage) {
-            // It's an image, show thumbnail, hide details text
             Glide.with(this).load(uri).into(imageView)
             fileDetailsLayout.visibility = View.GONE
         } else {
-            // It's a file, show generic icon + details
             imageView.setImageResource(R.drawable.ic_attach_file)
             imageView.scaleType = ImageView.ScaleType.FIT_CENTER
-            
-            // Show details
             fileDetailsLayout.visibility = View.VISIBLE
             fileNameView.text = filename
             fileSizeView.text = formatFileSize(size)
@@ -768,10 +839,8 @@ class TaskDetailActivity : AppCompatActivity() {
             return
         }
 
-        // Show loading indicator if needed
         var uploadCount = 0
         attachedUris.forEach { uri ->
-            // Extract file metadata locally
             var filename = "unknown_file"
             var size = 0L
             val type = contentResolver.getType(uri) ?: "application/octet-stream"
@@ -793,16 +862,15 @@ class TaskDetailActivity : AppCompatActivity() {
                 }
             }, onFailure = { e ->
                 Toast.makeText(this, "Failed to upload attachment: ${e.message}", Toast.LENGTH_SHORT).show()
-                uploadCount++ // Still proceed or handle error
+                uploadCount++
                 if (uploadCount == attachedUris.size) {
-                     addComment(commentText, uploadedAttachments) // Try adding comment with successful uploads
+                     addComment(commentText, uploadedAttachments)
                 }
             })
         }
     }
 
     private fun addComment(commentText: String, attachments: List<Attachment>) {
-        // Need to fetch user details to get profile image URL first
         firebaseHelper.getUserDetails(currentUserId, onSuccess = { user ->
             val profileImage = user?.profileImage ?: ""
              val comment = Comment(
@@ -825,7 +893,6 @@ class TaskDetailActivity : AppCompatActivity() {
                 }
             )
         }, onFailure = {
-            // Fallback if user details fail
              val comment = Comment(
                 taskId = taskId,
                 userId = currentUserId,

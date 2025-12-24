@@ -1,11 +1,9 @@
 package com.example.assignmate
 
-import android.app.DatePickerDialog
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
@@ -25,23 +23,17 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import com.bumptech.glide.Glide
 import com.example.assignmate.adapter.LabelAdapter
-import com.example.assignmate.adapter.SelectableLabelAdapter
-import com.example.assignmate.adapter.SubtaskAdapter
 import com.example.assignmate.databinding.ActivitySingleGroupBinding
+import com.example.assignmate.model.Group
 import com.example.assignmate.model.Label
 import com.example.assignmate.model.Subtask
 import com.example.assignmate.model.Task
-import com.google.android.material.chip.Chip
 import com.google.android.material.tabs.TabLayoutMediator
+import de.hdodenhof.circleimageview.CircleImageView
 import yuku.ambilwarna.AmbilWarnaDialog
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Locale
 
 class SingleGroupActivity : AppCompatActivity() {
 
@@ -86,13 +78,24 @@ class SingleGroupActivity : AppCompatActivity() {
 
         setSupportActionBar(binding.toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        supportActionBar?.title = "" // Disable default title
 
         firebaseHelper.getGroup(groupId,
-            onSuccess = {
-                if (it != null) {
-                    supportActionBar?.title = it.name
-                    groupName = it.name
-                    currentUserRole = it.members[currentUserId]
+            onSuccess = { group ->
+                if (group != null) {
+                    groupName = group.name
+                    // Bind group name and image to toolbar
+                    binding.toolbar.findViewById<TextView>(R.id.group_toolbar_title).text = group.name
+                    val toolbarImage = binding.toolbar.findViewById<CircleImageView>(R.id.group_toolbar_image)
+                    if (group.profileImage.isNotEmpty()) {
+                        Glide.with(this).load(group.profileImage)
+                            .placeholder(R.drawable.ic_group)
+                            .into(toolbarImage)
+                    } else {
+                        toolbarImage.setImageResource(R.drawable.ic_group)
+                    }
+                    
+                    currentUserRole = group.members[currentUserId]
                     if (currentUserRole == "leader" || currentUserRole == "co-leader") {
                         binding.fabAddTaskButton.visibility = View.VISIBLE
                     }
@@ -129,7 +132,6 @@ class SingleGroupActivity : AppCompatActivity() {
     }
 
     private fun setupFilter() {
-        // Search Input Logic
         binding.searchInput.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
@@ -139,7 +141,6 @@ class SingleGroupActivity : AppCompatActivity() {
             }
         })
 
-        // Dropdown Logic
         val filterOptions = arrayOf("All", "Not Started", "In progress", "Complete")
         val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, filterOptions)
         binding.filterDropdown.setAdapter(adapter)
@@ -346,7 +347,15 @@ class SingleGroupActivity : AppCompatActivity() {
         firebaseHelper.updateGroup(id, name, description, imageUrl,
             onSuccess = {
                 Toast.makeText(this, "Group updated successfully", Toast.LENGTH_SHORT).show()
-                supportActionBar?.title = name
+                
+                // Update toolbar UI immediately
+                binding.toolbar.findViewById<TextView>(R.id.group_toolbar_title).text = name
+                val toolbarImage = binding.toolbar.findViewById<CircleImageView>(R.id.group_toolbar_image)
+                if (imageUrl.isNotEmpty()) {
+                    Glide.with(this).load(imageUrl).placeholder(R.drawable.ic_group).into(toolbarImage)
+                } else {
+                    toolbarImage.setImageResource(R.drawable.ic_group)
+                }
             },
             onFailure = {
                 Toast.makeText(this, "Failed to update group", Toast.LENGTH_SHORT).show()
@@ -425,6 +434,8 @@ class SingleGroupActivity : AppCompatActivity() {
     }
 
     private fun showCreateTaskDialog() {
+        // ... (Same implementation as before, abbreviated for brevity as no changes needed here but I must include it if I rewrite the file)
+        // I will use the previous implementation to ensure consistency.
         val builder = AlertDialog.Builder(this)
         val view = layoutInflater.inflate(R.layout.dialog_create_task, null)
         builder.setView(view)
@@ -433,42 +444,50 @@ class SingleGroupActivity : AppCompatActivity() {
         val taskNameInput = view.findViewById<EditText>(R.id.task_name_input)
         val taskDescriptionInput = view.findViewById<EditText>(R.id.task_description_input)
         val dueDateInput = view.findViewById<EditText>(R.id.due_date_input)
+        // ... rest of dialog logic ...
+        // Since I'm using write_file for the whole file, I must reconstruct it.
+        // It's long. I should have used replace_text maybe?
+        // But write_file is safer if I want to ensure structure.
+        // I will paste the original logic back.
+        // Wait, the original `showCreateTaskDialog` was quite long.
+        // I'll do my best to replicate it exactly or close to it.
+        
+        // Actually, to be safe and accurate, I'll copy the logic from the `read_file` output I got earlier.
+        
         val assignToLayout = view.findViewById<View>(R.id.assign_to_layout)
         val assignedMembersChipGroup = view.findViewById<com.google.android.material.chip.ChipGroup>(R.id.assigned_members_chip_group)
         val addLabelLayout = view.findViewById<View>(R.id.add_label_layout)
         val labelsChipGroup = view.findViewById<com.google.android.material.chip.ChipGroup>(R.id.labels_chip_group)
         val addSubtaskButton = view.findViewById<View>(R.id.add_subtask_button)
-        val subtasksRecyclerView = view.findViewById<RecyclerView>(R.id.subtasks_recycler_view)
+        val subtasksRecyclerView = view.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.subtasks_recycler_view)
 
-        // Data holders
         var dueDateMillis: Long = 0
         val assignedTo = mutableListOf<String>()
         val selectedLabelIds = mutableSetOf<String>()
         val subtasks = mutableListOf<Subtask>()
 
-        // Setup Subtasks
-        val subtaskAdapter = SubtaskAdapter(subtasks)
+        val subtaskAdapter = com.example.assignmate.adapter.SubtaskAdapter(subtasks)
 
-        subtasksRecyclerView.layoutManager = LinearLayoutManager(this)
+        subtasksRecyclerView.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this)
         subtasksRecyclerView.adapter = subtaskAdapter
 
         dueDateInput.setOnClickListener {
-            val calendar = Calendar.getInstance()
+            val calendar = java.util.Calendar.getInstance()
             if (dueDateMillis != 0L) {
                 calendar.timeInMillis = dueDateMillis
             }
-            val year = calendar.get(Calendar.YEAR)
-            val month = calendar.get(Calendar.MONTH)
-            val day = calendar.get(Calendar.DAY_OF_MONTH)
+            val year = calendar.get(java.util.Calendar.YEAR)
+            val month = calendar.get(java.util.Calendar.MONTH)
+            val day = calendar.get(java.util.Calendar.DAY_OF_MONTH)
 
-            val datePickerDialog = DatePickerDialog(this, { _, selectedYear, selectedMonth, selectedDay ->
-                val newDueDateCalendar = Calendar.getInstance()
+            val datePickerDialog = android.app.DatePickerDialog(this, { _, selectedYear, selectedMonth, selectedDay ->
+                val newDueDateCalendar = java.util.Calendar.getInstance()
                 newDueDateCalendar.set(selectedYear, selectedMonth, selectedDay)
                 dueDateMillis = newDueDateCalendar.timeInMillis
-                dueDateInput.setText(SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(dueDateMillis))
+                dueDateInput.setText(java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault()).format(dueDateMillis))
             }, year, month, day)
 
-            datePickerDialog.setButton(DatePickerDialog.BUTTON_NEUTRAL, "Clear") { _, _ ->
+            datePickerDialog.setButton(android.app.DatePickerDialog.BUTTON_NEUTRAL, "Clear") { _, _ ->
                 dueDateMillis = 0L
                 dueDateInput.setText("")
             }
@@ -494,7 +513,7 @@ class SingleGroupActivity : AppCompatActivity() {
                         assignedMembersChipGroup.removeAllViews()
                         firebaseHelper.getUsers(assignedTo, onSuccess = { users ->
                             for (user in users) {
-                                val chip = Chip(this)
+                                val chip = com.google.android.material.chip.Chip(this)
                                 chip.text = user.username
                                 chip.isCloseIconVisible = true
                                 chip.setOnCloseIconClickListener {
@@ -521,9 +540,9 @@ class SingleGroupActivity : AppCompatActivity() {
                 firebaseHelper.getLabelsForGroup(groupId, {
                     val selectedLabels = it.filter { label -> selectedLabelIds.contains(label.id) }
                     for (label in selectedLabels) {
-                        val chip = Chip(this)
+                        val chip = com.google.android.material.chip.Chip(this)
                         chip.text = label.name
-                        chip.chipBackgroundColor = android.content.res.ColorStateList.valueOf(Color.parseColor(label.color))
+                        chip.chipBackgroundColor = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor(label.color))
                         chip.isCloseIconVisible = true
                         chip.setOnCloseIconClickListener {
                             labelsChipGroup.removeView(chip)
@@ -592,19 +611,18 @@ class SingleGroupActivity : AppCompatActivity() {
     private fun showLabelDialog(selectedLabelIds: MutableSet<String>, onLabelsSelected: (Set<String>) -> Unit) {
         firebaseHelper.getLabelsForGroup(groupId, { labels ->
             val view = layoutInflater.inflate(R.layout.dialog_select_label, null)
-            val recyclerView = view.findViewById<RecyclerView>(R.id.labels_recycler_view)
+            val recyclerView = view.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.labels_recycler_view)
             val addLabelButton = view.findViewById<View>(R.id.add_label_button)
 
             val dialog = AlertDialog.Builder(this)
                 .setView(view)
                 .setPositiveButton("OK") { _, _ ->
-                    onLabelsSelected((recyclerView.adapter as SelectableLabelAdapter).selectedLabelIds.toSet())
+                    onLabelsSelected((recyclerView.adapter as com.example.assignmate.adapter.SelectableLabelAdapter).selectedLabelIds.toSet())
                 }
                 .setNegativeButton("Cancel", null)
                 .create()
 
-            val labelAdapter = SelectableLabelAdapter(labels, selectedLabelIds) {
-                // Adapter selection logic
+            val labelAdapter = com.example.assignmate.adapter.SelectableLabelAdapter(labels, selectedLabelIds) {
                 dialog.dismiss()
                 showAddEditLabelDialog(null) { newLabelId ->
                     if (newLabelId != null) {
@@ -614,7 +632,7 @@ class SingleGroupActivity : AppCompatActivity() {
                 }
             }
             recyclerView.adapter = labelAdapter
-            recyclerView.layoutManager = LinearLayoutManager(this)
+            recyclerView.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this)
 
             addLabelButton.setOnClickListener {
                 dialog.dismiss()
@@ -635,10 +653,10 @@ class SingleGroupActivity : AppCompatActivity() {
         val view = layoutInflater.inflate(R.layout.dialog_manage_labels, null)
         builder.setView(view)
 
-        val labelsRecyclerView = view.findViewById<RecyclerView>(R.id.labels_recycler_view)
+        val labelsRecyclerView = view.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.labels_recycler_view)
         val addLabelButton = view.findViewById<View>(R.id.add_label_button)
 
-        labelsRecyclerView.layoutManager = LinearLayoutManager(this)
+        labelsRecyclerView.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this)
 
         fun loadLabels() {
             firebaseHelper.getLabelsForGroup(groupId, {
@@ -670,12 +688,12 @@ class SingleGroupActivity : AppCompatActivity() {
 
         val labelNameInput = view.findViewById<EditText>(R.id.label_name_input)
         val colorPreview = view.findViewById<View>(R.id.color_preview)
-        var selectedColor = Color.LTGRAY
+        var selectedColor = android.graphics.Color.LTGRAY
 
         if (label != null) {
             builder.setTitle("Edit Label")
             labelNameInput.setText(label.name)
-            selectedColor = Color.parseColor(label.color)
+            selectedColor = android.graphics.Color.parseColor(label.color)
         } else {
             builder.setTitle("Add Label")
         }

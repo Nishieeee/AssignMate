@@ -42,7 +42,6 @@ class FirebaseHelper {
     private val usersCollection = db.collection("users")
     private val tasksCollection = db.collection("tasks")
     private val commentsCollection = db.collection("comments")
-    // notificationsCollection is removed as we now use users/{userId}/notifications
     private val labelsCollection = db.collection("labels")
 
 
@@ -460,7 +459,12 @@ class FirebaseHelper {
                         .addOnSuccessListener { usersSnapshot ->
                             val users = usersSnapshot.toObjects(User::class.java)
                             val members = users.map { user ->
-                                Member(id = user.id, name = user.username, role = group.members[user.id] ?: "")
+                                Member(
+                                    id = user.id, 
+                                    name = user.username, 
+                                    role = group.members[user.id] ?: "",
+                                    profileImage = user.profileImage // Added profileImage
+                                )
                             }
                             onSuccess(members)
                         }
@@ -475,7 +479,6 @@ class FirebaseHelper {
     }
 
     fun removeMemberFromGroup(groupId: String, userId: String, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
-        // Notification Logic before removal
         val currentActorId = auth.currentUser?.uid ?: ""
         getUserDetails(userId, { removedUser ->
             getGroup(groupId, { group ->
@@ -572,18 +575,15 @@ class FirebaseHelper {
                         // 1. Status Changes
                         if (oldTask.status != status) {
                             if (status.equals("Complete", ignoreCase = true)) {
-                                // Task Completed
                                 notifyLeaders(oldTask.groupId, "Task Completed", "$actorName completed task '$title' in ${oldTask.groupName}", excludeUserId = currentUserId, taskId = taskId)
                                 assignedTo?.let {
                                      notifyUsers(it, "Task Completed", "Task '$title' in ${oldTask.groupName} was completed by $actorName", excludeUserId = currentUserId, taskId = taskId)
                                 }
                             } else if (oldTask.status.equals("Complete", ignoreCase = true)) {
-                                // Task Reopened
                                 assignedTo?.let {
                                     notifyUsers(it, "Task Reopened", "Task '$title' in ${oldTask.groupName} was reopened by $actorName", excludeUserId = currentUserId, taskId = taskId)
                                 }
                             } else {
-                                // Status Update (e.g., In Progress)
                                 assignedTo?.let {
                                      notifyUsers(it, "Task Updated", "Status of task '$title' in ${oldTask.groupName} changed to $status by $actorName", excludeUserId = currentUserId, taskId = taskId)
                                 }
@@ -602,13 +602,11 @@ class FirebaseHelper {
                         // 3. Assignment Changes
                         assignedTo?.forEach { userId ->
                             if (!oldTask.assignedTo.contains(userId)) {
-                                // New Assignment
                                 notifyUsers(listOf(userId), "New Task Assigned", "You were assigned the task '$title' in ${oldTask.groupName} by $actorName", excludeUserId = currentUserId, taskId = taskId)
                             }
                         }
                         
                         // 4. General Edit (if not completed and not just created)
-                        // Trigger 'Task Edited' for leaders if it's a significant edit and not just a status change we already notified about
                         if (status == oldTask.status && (title != oldTask.name || description != oldTask.description)) {
                              notifyLeaders(oldTask.groupId, "Task Edited", "$actorName edited task '$title' in ${oldTask.groupName}", excludeUserId = currentUserId, taskId = taskId)
                              assignedTo?.let {
@@ -646,10 +644,6 @@ class FirebaseHelper {
                             if (task != null) {
                                 val actorName = user?.username ?: "Someone"
                                 val taskName = task.name
-                                val groupName = task.groupName // Assumption: task has groupName. If not, fetch group. 
-                                // Task model has groupName.
-                                
-                                // Notify Assignees
                                 notifyUsers(
                                     task.assignedTo, 
                                     "New Comment", 
@@ -657,8 +651,6 @@ class FirebaseHelper {
                                     excludeUserId = currentUserId, 
                                     taskId = comment.taskId
                                 )
-                                
-                                // Notify Leaders
                                 notifyLeaders(
                                     task.groupId,
                                     "New Comment",
@@ -668,7 +660,6 @@ class FirebaseHelper {
                                 )
                             }
                         }, {})
-                        
                         onSuccess(documentReference.id)
                     }
                     .addOnFailureListener { e -> onFailure(e) }
@@ -695,7 +686,6 @@ class FirebaseHelper {
     }
 
     fun addNotification(notification: Notification, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
-        // Send to users/{userId}/notifications instead of global notifications
         usersCollection.document(notification.userId).collection("notifications").add(notification)
             .addOnSuccessListener { 
                 Log.d("FirebaseHelper", "Notification added successfully")
@@ -716,7 +706,6 @@ class FirebaseHelper {
             .addOnFailureListener { e -> onFailure(e) }
     }
     
-    // NEW: Real-time listener for notifications
     fun listenToNotifications(userId: String, onSuccess: (List<Notification>) -> Unit, onFailure: (Exception) -> Unit): ListenerRegistration {
         return usersCollection.document(userId).collection("notifications")
             .addSnapshotListener { querySnapshot, e ->
@@ -785,8 +774,6 @@ class FirebaseHelper {
                 val currentUserId = auth.currentUser?.uid ?: ""
                 getUserDetails(currentUserId, { user ->
                     val actorName = user?.username ?: "Someone"
-                    
-                    // Notify Assigned Users
                     notifyUsers(
                         task.assignedTo,
                         "New Task Assigned",
@@ -794,8 +781,6 @@ class FirebaseHelper {
                         excludeUserId = currentUserId,
                         taskId = documentReference.id
                     )
-                    
-                    // Notify Leaders
                     notifyLeaders(
                         task.groupId,
                         "New Task Created",
@@ -890,7 +875,6 @@ class FirebaseHelper {
             .dispatch()
     }
     
-    // Notification Helpers
     private fun notifyLeaders(groupId: String, title: String, content: String, excludeUserId: String? = null, taskId: String = "") {
          getGroup(groupId, { group ->
              group?.members?.forEach { (memberId, role) ->

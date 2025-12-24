@@ -5,11 +5,14 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.PopupMenu
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
 import com.example.assignmate.R
 import com.example.assignmate.model.Member
+import de.hdodenhof.circleimageview.CircleImageView
 
 class MembersAdapter(
     private val members: List<Member>,
@@ -79,6 +82,7 @@ class MembersAdapter(
     class MemberViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val memberName: TextView = itemView.findViewById(R.id.member_name)
         val memberActionsButton: ImageButton = itemView.findViewById(R.id.member_actions_button)
+        private val memberImage: CircleImageView = itemView.findViewById(R.id.member_image)
 
         fun bind(member: Member, isCurrentUser: Boolean) {
             var name = member.name
@@ -94,6 +98,16 @@ class MembersAdapter(
             } else {
                 // Reset to default color (e.g., black) for other items to avoid recycling issues
                 memberName.setTextColor(Color.BLACK) 
+            }
+
+            // Load profile image
+            if (member.profileImage.isNotEmpty()) {
+                Glide.with(itemView.context)
+                    .load(member.profileImage)
+                    .placeholder(R.drawable.ic_profile_user)
+                    .into(memberImage)
+            } else {
+                memberImage.setImageResource(R.drawable.ic_profile_user)
             }
         }
     }
