@@ -24,10 +24,16 @@ class introduction : AppCompatActivity() {
 
         // Check authentication and first-run status
         val auth = FirebaseAuth.getInstance()
-        if (auth.currentUser != null) {
-            startActivity(Intent(this, MainActivity::class.java))
-            finish()
-            return
+        val currentUser = auth.currentUser
+        if (currentUser != null) {
+            if (currentUser.isEmailVerified) {
+                startActivity(Intent(this, MainActivity::class.java))
+                finish()
+                return
+            } else {
+                // If user is logged in but not verified, sign them out so they can see the intro or login again
+                auth.signOut()
+            }
         }
 
         val prefs = getSharedPreferences("AssignMatePrefs", MODE_PRIVATE)

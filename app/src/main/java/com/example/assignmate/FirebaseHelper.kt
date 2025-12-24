@@ -48,8 +48,14 @@ class FirebaseHelper {
     fun loginUser(email: String, password: String, onSuccess: (String) -> Unit, onFailure: (Exception) -> Unit) {
         auth.signInWithEmailAndPassword(email, password)
             .addOnSuccessListener {
-                val userId = auth.currentUser?.uid ?: ""
-                onSuccess(userId)
+                val user = auth.currentUser
+                if (user != null && user.isEmailVerified) {
+                    val userId = user.uid
+                    onSuccess(userId)
+                } else {
+                    auth.signOut()
+                    onFailure(Exception("Email not verified. Please check your inbox."))
+                }
             }
             .addOnFailureListener { e ->
                 onFailure(e)
@@ -67,9 +73,17 @@ class FirebaseHelper {
             .addOnSuccessListener { authResult ->
                 val userId = authResult.user?.uid ?: ""
                 val user = User(id = userId, username = username, email = email)
-                usersCollection.document(userId).set(user)
-                    .addOnSuccessListener { onSuccess() }
-                    .addOnFailureListener { e -> onFailure(e) }
+                
+                // Send email verification
+                authResult.user?.sendEmailVerification()
+                    ?.addOnSuccessListener {
+                        usersCollection.document(userId).set(user)
+                            .addOnSuccessListener { onSuccess() }
+                            .addOnFailureListener { e -> onFailure(e) }
+                    }
+                    ?.addOnFailureListener { e ->
+                        onFailure(e)
+                    }
             }
             .addOnFailureListener { e ->
                 onFailure(e)

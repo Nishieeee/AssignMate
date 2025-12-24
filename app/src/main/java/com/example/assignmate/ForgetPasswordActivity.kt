@@ -19,23 +19,11 @@ class ForgetPasswordActivity : AppCompatActivity() {
 
         auth = FirebaseAuth.getInstance()
 
-        binding.saveButton.setOnClickListener {
+        binding.sendVerificationButton.setOnClickListener {
             val email = binding.email.text.toString().trim()
-            val newPassword = binding.newPassword.text.toString().trim()
-            val confirmNewPassword = binding.confirmNewPassword.text.toString().trim()
 
-            if (email.isEmpty() || newPassword.isEmpty() || confirmNewPassword.isEmpty()) {
-                Toast.makeText(this, "Please fill all fields", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-
-            if (newPassword != confirmNewPassword) {
-                Toast.makeText(this, "Passwords do not match", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-
-            if (newPassword.length < 6) {
-                Toast.makeText(this, "Password must be at least 6 characters long", Toast.LENGTH_SHORT).show()
+            if (email.isEmpty()) {
+                Toast.makeText(this, "Please enter your email", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 
@@ -43,9 +31,8 @@ class ForgetPasswordActivity : AppCompatActivity() {
             auth.sendPasswordResetEmail(email)
                 .addOnCompleteListener { task ->
                     if (task.isSuccessful) {
-                        Toast.makeText(this, "Password reset email sent to $email", Toast.LENGTH_SHORT).show()
-                        // Sign out and redirect to login
-                        auth.signOut()
+                        Toast.makeText(this, "Verification link sent to $email. Please check your email to reset your password.", Toast.LENGTH_LONG).show()
+                        // Redirect to login after sending email
                         startActivity(Intent(this, LoginActivity::class.java))
                         finish()
                     } else {

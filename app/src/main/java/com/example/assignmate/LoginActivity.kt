@@ -18,26 +18,20 @@ class LoginActivity : AppCompatActivity() {
 
         auth = FirebaseAuth.getInstance()
         
-        // Remove onStart auth check logic from here or simplify it, 
-        // but since Introduction activity now handles the "initial launch" logic,
-        // LoginActivity is reached only if user is NOT logged in or has completed introduction.
-        // However, if the user explicitly launched LoginActivity but is already logged in,
-        // we should probably still redirect them to MainActivity.
-        // The user said: "if a user is signed in, it should open activity_main.xml".
-        // The Introduction activity already checks for signed-in user and redirects to MainActivity.
-        // If we fall through to LoginActivity, it means either:
-        // 1. We came from Introduction (user not signed in, first run done)
-        // 2. We came from Introduction (user not signed in, first run just finished)
-        // 3. We opened app and Introduction redirected us here because not signed in + first run done.
-        
-        // So checking auth here again is safe and good practice.
-
-        if (auth.currentUser != null) {
-            val intent = Intent(this, MainActivity::class.java)
-            intent.putExtra("USER_ID", auth.currentUser!!.uid)
-            startActivity(intent)
-            finish()
-            return
+        // Check if user is already logged in and verified
+        val currentUser = auth.currentUser
+        if (currentUser != null) {
+            if (currentUser.isEmailVerified) {
+                val intent = Intent(this, MainActivity::class.java)
+                intent.putExtra("USER_ID", currentUser.uid)
+                startActivity(intent)
+                finish()
+                return
+            } else {
+                // User is logged in but not verified (e.g. from previous session or just registered without signout)
+                // Sign out to force login and verification check
+                auth.signOut()
+            }
         }
 
         binding = ActivityLoginBinding.inflate(layoutInflater)
@@ -59,7 +53,7 @@ class LoginActivity : AppCompatActivity() {
                         finish()
                     },
                     onFailure = {
-                        Toast.makeText(this, "Invalid email or password.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, it.message ?: "Login failed", Toast.LENGTH_SHORT).show()
                     }
                 )
             } else {
