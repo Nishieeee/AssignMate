@@ -52,9 +52,19 @@ class LoginActivity : AppCompatActivity() {
                         startActivity(intent)
                         finish()
                     },
-                    onFailure = {
-                        Toast.makeText(this, it.message ?: "Login failed", Toast.LENGTH_SHORT).show()
+                    onFailure = { exception ->
+                        // Determine the error message based on the exception type
+                        val errorMessage = when (exception) {
+                            is com.google.firebase.auth.FirebaseAuthInvalidUserException -> "Account not found. Please register."
+                            is com.google.firebase.auth.FirebaseAuthInvalidCredentialsException -> "Incorrect email or password."
+                            is com.google.firebase.auth.FirebaseAuthUserCollisionException -> "This email is already in use."
+                            is com.google.firebase.FirebaseNetworkException -> "Network error. Check your connection."
+                            else -> "Login failed. Please try again." // Fallback for unknown errors
+                        }
+
+                        Toast.makeText(this, errorMessage, Toast.LENGTH_SHORT).show()
                     }
+
                 )
             } else {
                 Toast.makeText(this, "Please fill all fields", Toast.LENGTH_SHORT).show()
